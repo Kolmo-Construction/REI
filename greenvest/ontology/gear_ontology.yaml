@@ -1,0 +1,86 @@
+# REI Gear Ontology
+# Format: category.alias_key: {spec_key: value, ...}
+# Matched terms populate derived_specs directly (confidence = 1.0)
+# Unmatched residue falls through to LLM
+
+sleeping_bags:
+  "sleeps cold / cold sleeper":
+    temp_rating_f: "subtract 10 from stated rating"
+    note: "recommend EN-tested ratings, not comfort ratings"
+  "backpacking / backpack":
+    fill_type: "down OR synthetic"
+    weight_oz: "<32"
+  "car camping / car camp":
+    fill_type: "synthetic"
+    note: "moisture-tolerant"
+  "wet climate / PNW / coastal / pacific northwest / washington / oregon":
+    fill_type: "synthetic"
+    water_resistance: "hydrophobic_down OR synthetic"
+  "winter camping / winter camp":
+    fill_type: "synthetic"
+    temp_rating_f: "<=15"
+    r_value: ">=4.5"
+  "ultralight / ultra-light":
+    weight_oz: "<20"
+    fill_type: "down"
+  "three season / 3 season":
+    temp_rating_f: "<=32"
+
+sleeping_pads:
+  "side sleeper":
+    r_value: "+1.0 over activity baseline"
+    width_in: ">=25"
+  "alpine / winter camping / winter camp":
+    r_value: ">=4.5"
+  "thru-hiking / thru hiking / thru hike":
+    r_value: ">=2.0"
+    weight_oz: "<16"
+  "car camping / car camp":
+    r_value: ">=2.0"
+    note: "weight unconstrained"
+  "backpacking / backpack":
+    r_value: ">=3.0"
+    weight_oz: "<24"
+
+footwear:
+  "waterproof / water resistant":
+    technology: "GORE-TEX OR eVent OR brand waterproof membrane"
+    note: "clarify use case — waterproof reduces breathability"
+  "trail running / trail run":
+    sole: "lugged"
+    weight_oz: "<10"
+    drop_mm: "<=8"
+  "approach":
+    sole: "sticky rubber"
+    ankle: "low OR mid"
+  "mountaineering / alpine climbing":
+    crampon_compatible: "true"
+    waterproof: "true"
+  "PNW / pacific northwest / wet":
+    waterproof: "true"
+    technology: "GORE-TEX OR eVent"
+
+jackets:
+  "wet climate / PNW / coastal / pacific northwest":
+    waterproof: "true"
+    seam_sealed: "true"
+    breathability: "high"
+  "alpine / mountaineering":
+    waterproof: "true"
+    weight_oz: "<16"
+  "running / trail running":
+    weight_oz: "<8"
+    packable: "true"
+
+backpacks:
+  "thru-hiking / thru hiking":
+    capacity_liters: ">=55"
+    weight_oz: "<48"
+    hipbelt: "load-bearing"
+  "day hiking / day hike":
+    capacity_liters: "15-30"
+  "overnight / weekend":
+    capacity_liters: "30-55"
+  "ultralight":
+    weight_oz: "<32"
+    frame: "frameless OR minimal"
