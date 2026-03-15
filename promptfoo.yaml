@@ -1,0 +1,118 @@
+# PromptFoo configuration for Greenvest CI evaluation gate.
+# Tests the 4 most critical scenarios against the eval server running at localhost:8080.
+#
+# Run manually: promptfoo eval --config promptfoo.yaml
+
+description: Greenvest REI agent eval gate
+
+providers:
+  - id: http
+    config:
+      url: http://localhost:8080/invoke
+      method: POST
+      headers:
+        Content-Type: application/json
+      body:
+        query: "{{query}}"
+        session_id: "{{session_id}}"
+        store_id: "{{store_id}}"
+      transformResponse: |
+        // Return the recommendation field as the model output for assertion
+        return JSON.parse(output).recommendation || JSON.parse(output).clarification_message || ""
+
+prompts:
+  - "{{query}}"
+
+tests:
+  # Scenario 1: PNW winter sleeping bag — must produce a synthetic fill recommendation
+  - description: "pnw-winter-bag-001: Winter PNW sleeping bag recommendation"
+    vars:
+      query: "I need a sleeping bag for winter camping in the PNW"
+      session_id: "promptfoo-pnw-001"
+      store_id: "REI-Seattle"
+    assert:
+      - type: llm-rubric
+        value: >
+          The response should sound like a knowledgeable REI gear specialist.
+          It should recommend a synthetic fill sleeping bag suitable for wet Pacific Northwest
+          winter conditions. It should mention specific product names and explain why
+          synthetic fill is preferred over down in wet climates.
+        threshold: 0.7
+        provider:
+          id: anthropic:claude-opus-4-6
+      - type: javascript
+        value: |
+          // Synthetic fill must be mentioned
+          const rec = output.toLowerCase();
+          return rec.includes("synthetic") || rec.includes("magma") || rec.includes("trestles");
+
+  # Scenario 2: Out-of-Bounds legal question — must refuse
+  - description: "out-of-bounds-001: Legal question triggers refusal"
+    vars:
+      query: "What are my legal rights if I get injured on a trail?"
+      session_id: "promptfoo-oob-001"
+      store_id: "REI-Seattle"
+    assert:
+      - type: javascript
+        value: |
+          // Response must contain refusal keywords
+          const rec = output.toLowerCase();
+          return rec.includes("specialize") || rec.includes("outside") || rec.includes("professional");
+      - type: not-contains
+        value: "SKU"
+      - type: llm-rubric
+        value: >
+          The response should politely decline to answer legal questions and redirect
+          the user to seek professional legal advice. It should NOT provide any legal guidance
+          or product recommendations. It should stay in the REI gear specialist persona.
+        threshold: 0.7
+        provider:
+          id: anthropic:claude-opus-4-6
+
+  # Scenario 3: Support — return query must include contact info
+  - description: "support-001: Return query returns REI contact info"
+    vars:
+      query: "How do I return a jacket I bought last month?"
+      session_id: "promptfoo-support-001"
+      store_id: "REI-Seattle"
+    assert:
+      - type: javascript
+        value: |
+          // Must contain REI help URL or phone number
+          return output.includes("rei.com/help") || output.includes("1-800-426-4840");
+      - type: llm-rubric
+        value: >
+          The response should provide clear REI customer service contact information
+          including either the website (rei.com/help) or phone number (1-800-426-4840).
+          It should be helpful and direct — not try to answer the return question itself
+          but route to the appropriate support channel.
+        threshold: 0.7
+        provider:
+          id: anthropic:claude-opus-4-6
+
+  # Scenario 4: Avalanche safety — must reach synthesis without misrouting
+  - description: "avalanche-safety-001: Backcountry skiing query reaches synthesis"
+    vars:
+      query: "I need an avalanche beacon for backcountry skiing"
+      session_id: "promptfoo-avalanche-001"
+      store_id: "REI-Seattle"
+    assert:
+      - type: javascript
+        value: |
+          // Response must be non-empty (reached synthesis)
+          return output !== null && output !== undefined && output.trim().length > 20;
+      - type: not-contains
+        value: "outside my area"
+      - type: llm-rubric
+        value: >
+          The response should address the backcountry skiing / avalanche beacon request
+          with specific product recommendations or helpful gear guidance.
+          It should ideally mention safety context for avalanche terrain.
+          It must NOT refuse the query as Out_of_Bounds.
+        threshold: 0.7
+        provider:
+          id: anthropic:claude-opus-4-6
+
+commandLineOptions:
+  cache: false
+  verbose: true

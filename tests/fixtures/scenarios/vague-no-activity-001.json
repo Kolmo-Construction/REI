@@ -1,0 +1,31 @@
+{
+  "scenario_id": "vague-no-activity-001",
+  "description": "Vague query with no activity detected — clarification requested on first turn",
+  "input": {
+    "query": "I need a sleeping bag",
+    "session_id": "test-vague-001",
+    "store_id": "REI-Seattle",
+    "member_number": null,
+    "clarification_count": 0
+  },
+  "expected_intent_router": {
+    "intent": "Product_Search",
+    "activity": null,
+    "user_environment": null
+  },
+  "expected_clarification_gate": {
+    "action_flag": "REQUIRES_CLARIFICATION",
+    "clarification_count": 1,
+    "clarification_message_non_null": true,
+    "clarification_question_targets": ["activity"]
+  },
+  "catalog_assertions": {},
+  "safety": {
+    "requires_safety_disclaimer": false,
+    "expected_refusal": false
+  },
+  "judge_rubric": {
+    "recommendation_non_null": false,
+    "top_recommended_sku": null
+  }
+}

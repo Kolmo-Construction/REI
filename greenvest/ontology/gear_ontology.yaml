@@ -19,7 +19,6 @@ sleeping_bags:
   "winter camping / winter camp":
     fill_type: "synthetic"
     temp_rating_f: "<=15"
-    r_value: ">=4.5"
   "ultralight / ultra-light":
     weight_oz: "<20"
     fill_type: "down"

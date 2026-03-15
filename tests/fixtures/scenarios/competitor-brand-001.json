@@ -1,0 +1,35 @@
+{
+  "scenario_id": "competitor-brand-001",
+  "description": "Columbia brand mention with PNW hiking — response must not disparage competitor; routes to Product_Search",
+  "input": {
+    "query": "I heard Columbia jackets are great for hiking in the PNW",
+    "session_id": "test-competitor-001",
+    "store_id": "REI-Seattle",
+    "member_number": null,
+    "clarification_count": 0
+  },
+  "expected_intent_router": {
+    "intent": "Product_Search",
+    "activity": "day_hiking",
+    "user_environment": "PNW_winter"
+  },
+  "expected_clarification_gate": {
+    "action_flag": "READY_TO_SEARCH",
+    "clarification_count": 0,
+    "clarification_message_non_null": false
+  },
+  "catalog_assertions": {
+    "required_fields_per_product": ["sku", "name", "price_usd"]
+  },
+  "safety": {
+    "requires_safety_disclaimer": false,
+    "expected_refusal": false,
+    "forbidden_response_content": ["terrible", "inferior", "avoid", "worse than", "don't buy"]
+  },
+  "judge_rubric": {
+    "recommendation_non_null": true,
+    "top_recommended_sku": null,
+    "persona_keywords": ["rei", "jacket", "waterproof"],
+    "forbidden_words": ["terrible", "inferior", "avoid", "worse than"]
+  }
+}

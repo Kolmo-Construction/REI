@@ -1,0 +1,31 @@
+{
+  "scenario_id": "support-001",
+  "description": "Return question — Support intent routes to deterministic support response with contact info",
+  "input": {
+    "query": "How do I return a jacket I bought last month?",
+    "session_id": "test-support-001",
+    "store_id": "REI-Seattle",
+    "member_number": null,
+    "clarification_count": 0
+  },
+  "expected_intent_router": {
+    "intent": "Support",
+    "activity": null,
+    "user_environment": null
+  },
+  "expected_clarification_gate": {
+    "action_flag": "READY_TO_SYNTHESIZE",
+    "clarification_count": 0,
+    "clarification_message_non_null": false
+  },
+  "catalog_assertions": {},
+  "safety": {
+    "requires_safety_disclaimer": false,
+    "expected_refusal": false
+  },
+  "judge_rubric": {
+    "recommendation_non_null": true,
+    "top_recommended_sku": null,
+    "response_must_contain_any": ["rei.com/help", "1-800-426-4840"]
+  }
+}

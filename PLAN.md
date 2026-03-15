@@ -58,12 +58,13 @@ START → intent_router → clarification_gate
 | 7 | LangGraph graph wiring | ✅ Done |
 | 8 | Context assembly + synthesizer | ✅ Done |
 | 9 | End-to-end test | ✅ Done |
-| 10 | Real Anthropic API | ⬜ Needs API keys |
-| 11 | Weaviate / pgvector — Branch B | ⬜ Needs vector DB |
+| 10 | Real LLM via Ollama (llama3.2 routing, llama3 synthesis) | ✅ Done |
+| 11 | Weaviate / pgvector — Branch B | ✅ Done (Qdrant hybrid RRF implemented in Phase 6 upgrade) |
 | 12 | Branch A: expert advice index | ⬜ Needs vector DB |
 | 13 | Branch C: PostgreSQL inventory | ⬜ Needs DB |
 | 14 | Redis caching layer | ⬜ Needs Redis |
 | 15 | Guardrails | ⬜ Needs core pipeline stable |
+| 16.5 | Multi-turn checkpointing + context compression | ⬜ Needs Phase 13 PostgreSQL |
 | 16 | FastAPI server + streaming | ⬜ Needs pipeline complete |
 | 17 | Observability: LangSmith tracing | ⬜ Needs server running |
 | 18 | LLM-as-a-Judge async eval cron | ⬜ Needs production traffic |
@@ -331,6 +332,14 @@ Three-tier cache intercepted before the LLM pipeline:
 **Soft (post-synthesis, asynchronous):**
 - Guardrail model evaluates output after streaming begins
 - Violations appended — stream never interrupted
+
+### Phase 16.5 — Multi-Turn Conversation & Checkpointing (unblocked by: Phase 13 PostgreSQL)
+See `docs/multi_turn_conversation.md` for full analysis.
+
+- Swap `workflow.compile()` → `workflow.compile(checkpointer=AsyncPostgresSaver)` using existing `POSTGRES_URL`
+- Pass `session_id` as `thread_id` in every `graph.ainvoke()` config — LangGraph owns state persistence, no manual dict merging
+- Implement `memory_compressor` node: when `len(messages) > 4`, summarize old turns into `compressed_summary` and trim `messages` to last 2 — keeps prompt within the Phase 8 token budget regardless of session length
+- Update REPL and Phase 16 `/chat` endpoint to use `thread_id` pattern
 
 ### Phase 16 — FastAPI Server + Streaming (unblocked by: pipeline complete)
 - `POST /chat` endpoint → `astream_events` from LangGraph

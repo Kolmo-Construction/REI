@@ -9,59 +9,68 @@ if TYPE_CHECKING:
     from greenvest.state import GreenvestState
 
 
+def _extract_activity(q: str) -> str | None:
+    """Extract and normalize activity from a lowercased query string."""
+    if "winter camping" in q or "winter camp" in q:
+        return "winter_camping"
+    if "thru-hik" in q or "thru hik" in q or "thru hiking" in q or "thru-hiking" in q:
+        return "thru_hiking"
+    if "backpacking" in q or "backpack" in q:
+        return "backpacking"
+    if "car camping" in q or "car camp" in q:
+        return "car_camping"
+    if "rock climbing" in q or "rock climb" in q or "bouldering" in q:
+        return "rock_climbing"
+    if "ski" in q or "skiing" in q or "snowboard" in q:
+        return "skiing"
+    if "mountaineer" in q:
+        return "mountaineering"
+    if "alpine climbing" in q or "alpine climb" in q:
+        return "alpine_climbing"
+    # hiking synonyms and common misspellings
+    if any(w in q for w in ["hiking", "hikking", "hikin", "hike", "trekking", "trek", "trail walk", "trail run"]):
+        return "day_hiking"
+    if "camping" in q or "camp" in q:
+        return "car_camping"
+    return None
+
+
+def _extract_environment(q: str) -> str | None:
+    if "pnw" in q or "pacific northwest" in q or "washington" in q or "oregon" in q:
+        return "PNW_winter"
+    if "desert" in q:
+        return "desert_summer"
+    if "alpine" in q:
+        return "alpine"
+    if "coastal" in q or "coast" in q:
+        return "coastal"
+    return None
+
+
 def mock_intent_router(query: str) -> dict:
     """
     Returns a deterministic intent parse.
-    Handles a handful of test cases; defaults to Product_Search.
+    Intent and entity extraction are independent — activity/environment are
+    always extracted regardless of which intent is detected.
     """
     q = query.lower()
 
+    # Classify intent
     if any(w in q for w in ["medical", "legal", "financial", "tax"]):
-        return {
-            "intent": "Out_of_Bounds",
-            "activity": None,
-            "user_environment": None,
-            "experience_level": None,
-        }
+        intent = "Out_of_Bounds"
+    elif any(w in q for w in ["return", "order", "warranty", "repair"]):
+        intent = "Support"
+    elif any(w in q for w in ["how to", "what is", "explain", "teach", "best", "recommend", "should i"]):
+        intent = "Education"
+    else:
+        intent = "Product_Search"
 
-    if any(w in q for w in ["return", "order", "warranty", "repair"]):
-        return {
-            "intent": "Support",
-            "activity": None,
-            "user_environment": None,
-            "experience_level": None,
-        }
-
-    if any(w in q for w in ["how to", "what is", "explain", "teach"]):
-        return {
-            "intent": "Education",
-            "activity": None,
-            "user_environment": None,
-            "experience_level": None,
-        }
-
-    # Default: Product_Search with PNW winter camping signal
-    activity = None
-    environment = None
-
-    if "winter camping" in q or "winter camp" in q:
-        activity = "winter_camping"
-    elif "backpacking" in q or "backpack" in q:
-        activity = "backpacking"
-    elif "car camping" in q or "car camp" in q:
-        activity = "car_camping"
-    elif "thru" in q or "thru-hik" in q:
-        activity = "thru_hiking"
-
-    if "pnw" in q or "pacific northwest" in q or "washington" in q or "oregon" in q:
-        environment = "PNW_winter"
-    elif "desert" in q:
-        environment = "desert_summer"
-    elif "alpine" in q:
-        environment = "alpine"
+    # Entity extraction is always performed, regardless of intent
+    activity = _extract_activity(q)
+    environment = _extract_environment(q)
 
     return {
-        "intent": "Product_Search",
+        "intent": intent,
         "activity": activity,
         "user_environment": environment,
         "experience_level": None,

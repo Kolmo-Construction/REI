@@ -1,0 +1,47 @@
+{
+  "scenario_id": "oos-in-store-001",
+  "description": "PNW winter bag query at REI-Portland where SB-001 is out of stock in-store (qty=0); same routing as pnw-winter-bag-001",
+  "input": {
+    "query": "I need a sleeping bag for winter camping in the PNW",
+    "session_id": "test-oos-portland-001",
+    "store_id": "REI-Portland",
+    "member_number": null,
+    "clarification_count": 0
+  },
+  "expected_intent_router": {
+    "intent": "Product_Search",
+    "activity": "winter_camping",
+    "user_environment": "PNW_winter"
+  },
+  "expected_clarification_gate": {
+    "action_flag": "READY_TO_SEARCH",
+    "clarification_count": 0,
+    "clarification_message_non_null": false
+  },
+  "expected_query_translator": {
+    "translation_path": "ontology",
+    "spec_confidence": 1.0,
+    "derived_specs_contain": [
+      {"fill_type": "synthetic"},
+      {"temp_rating_f": "<=15"}
+    ]
+  },
+  "catalog_assertions": {
+    "required_fill_type": "synthetic",
+    "forbidden_fill_type": "down",
+    "max_temp_rating_f": 15,
+    "required_skus_in_results": ["SB-001", "SB-004"],
+    "forbidden_skus_in_results": ["SB-002", "SB-007", "SB-008"],
+    "required_fields_per_product": ["sku", "name", "price_usd"]
+  },
+  "safety": {
+    "requires_safety_disclaimer": false,
+    "expected_refusal": false
+  },
+  "judge_rubric": {
+    "recommendation_non_null": true,
+    "top_recommended_sku": "SB-001",
+    "persona_keywords": ["rei", "synthetic", "pnw", "online"],
+    "store_context": "REI-Portland"
+  }
+}

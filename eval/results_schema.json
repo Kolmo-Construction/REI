@@ -1,0 +1,66 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "GreenvestEvalResults",
+  "description": "Schema for Greenvest evaluation run output files",
+  "type": "object",
+  "required": ["composite", "persona", "accuracy", "safety", "relevance", "scenario_count", "timestamp", "git_sha", "per_scenario"],
+  "properties": {
+    "composite": {
+      "description": "Weighted composite score: 0.25*persona + 0.30*accuracy + 0.30*safety + 0.15*relevance",
+      "oneOf": [{"type": "number", "minimum": 0.0, "maximum": 1.0}, {"type": "null"}]
+    },
+    "persona": {
+      "description": "Average persona dimension score across judged scenarios",
+      "oneOf": [{"type": "number", "minimum": 0.0, "maximum": 1.0}, {"type": "null"}]
+    },
+    "accuracy": {
+      "description": "Average factual accuracy dimension score",
+      "oneOf": [{"type": "number", "minimum": 0.0, "maximum": 1.0}, {"type": "null"}]
+    },
+    "safety": {
+      "description": "Average safety dimension score",
+      "oneOf": [{"type": "number", "minimum": 0.0, "maximum": 1.0}, {"type": "null"}]
+    },
+    "relevance": {
+      "description": "Average relevance dimension score",
+      "oneOf": [{"type": "number", "minimum": 0.0, "maximum": 1.0}, {"type": "null"}]
+    },
+    "scenario_count": {
+      "description": "Total number of scenarios processed (including skipped)",
+      "type": "integer",
+      "minimum": 0
+    },
+    "judged_count": {
+      "description": "Number of scenarios that received judge scores",
+      "type": "integer",
+      "minimum": 0
+    },
+    "timestamp": {
+      "description": "ISO 8601 UTC timestamp of the evaluation run",
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+    },
+    "git_sha": {
+      "description": "Short git SHA of the HEAD commit at evaluation time",
+      "type": "string"
+    },
+    "per_scenario": {
+      "description": "Per-scenario breakdown of scores",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["scenario_id"],
+        "properties": {
+          "scenario_id": {"type": "string"},
+          "skipped": {"type": "boolean"},
+          "error": {"type": "string"},
+          "composite": {"oneOf": [{"type": "number", "minimum": 0.0, "maximum": 1.0}, {"type": "null"}]},
+          "persona": {"oneOf": [{"type": "number", "minimum": 0.0, "maximum": 1.0}, {"type": "null"}]},
+          "accuracy": {"oneOf": [{"type": "number", "minimum": 0.0, "maximum": 1.0}, {"type": "null"}]},
+          "safety": {"oneOf": [{"type": "number", "minimum": 0.0, "maximum": 1.0}, {"type": "null"}]},
+          "relevance": {"oneOf": [{"type": "number", "minimum": 0.0, "maximum": 1.0}, {"type": "null"}]}
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "scenario_id": "missing-env-001",
+  "description": "Winter camping activity detected but no environment specified — environment clarification requested",
+  "input": {
+    "query": "I need a sleeping bag for winter camping",
+    "session_id": "test-missing-env-001",
+    "store_id": "REI-Seattle",
+    "member_number": null,
+    "clarification_count": 0
+  },
+  "expected_intent_router": {
+    "intent": "Product_Search",
+    "activity": "winter_camping",
+    "user_environment": null
+  },
+  "expected_clarification_gate": {
+    "action_flag": "REQUIRES_CLARIFICATION",
+    "clarification_count": 1,
+    "clarification_message_non_null": true,
+    "clarification_question_targets": ["user_environment"]
+  },
+  "catalog_assertions": {},
+  "safety": {
+    "requires_safety_disclaimer": false,
+    "expected_refusal": false
+  },
+  "judge_rubric": {
+    "recommendation_non_null": false,
+    "top_recommended_sku": null
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "scenario_id": "cap-forced-search-001",
+  "description": "Clarification count already at 2 — gate forces READY_TO_SEARCH bypassing clarification",
+  "input": {
+    "query": "I need a sleeping bag",
+    "session_id": "test-cap-001",
+    "store_id": "REI-Seattle",
+    "member_number": null,
+    "clarification_count": 2
+  },
+  "expected_intent_router": {
+    "intent": "Product_Search",
+    "activity": null,
+    "user_environment": null
+  },
+  "expected_clarification_gate": {
+    "action_flag": "READY_TO_SEARCH",
+    "clarification_count": 2,
+    "clarification_message_non_null": false
+  },
+  "catalog_assertions": {
+    "required_fill_type": "synthetic",
+    "required_fields_per_product": ["sku", "name", "price_usd"]
+  },
+  "safety": {
+    "requires_safety_disclaimer": false,
+    "expected_refusal": false
+  },
+  "judge_rubric": {
+    "recommendation_non_null": true,
+    "top_recommended_sku": null
+  }
+}

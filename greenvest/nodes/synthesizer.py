@@ -60,7 +60,10 @@ def assemble_context(state: GreenvestState) -> str:
     if expert_chunks:
         sections.append("[Expert advice]")
         for chunk in expert_chunks:
-            sections.append(f"- {chunk}")
+            if isinstance(chunk, dict):
+                sections.append(f"- {chunk.get('section', '')}: {chunk.get('chunk_text', '')}")
+            else:
+                sections.append(f"- {chunk}")
         sections.append("")
 
     # Catalog results

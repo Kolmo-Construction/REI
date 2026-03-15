@@ -1,7 +1,7 @@
 """
 LLM provider factory.
 Returns mock callables when USE_MOCK_LLM=True.
-Returns real API clients when USE_MOCK_LLM=False (wired in later phases).
+Returns Ollama callables when USE_MOCK_LLM=False.
 """
 from __future__ import annotations
 from typing import Callable, TYPE_CHECKING
@@ -20,17 +20,19 @@ if TYPE_CHECKING:
 def get_intent_router() -> Callable[[str], dict]:
     if settings.USE_MOCK_LLM:
         return mock_intent_router
-    # Phase 10: wire Gemini Flash / GPT-4o-mini here
-    raise NotImplementedError("Real LLM not configured — set USE_MOCK_LLM=true or provide API keys")
+    from greenvest.providers.ollama_llm import ollama_intent_router
+    return ollama_intent_router
 
 
 def get_query_translator() -> Callable[["GreenvestState"], dict]:
     if settings.USE_MOCK_LLM:
         return mock_query_translator
-    raise NotImplementedError("Real LLM not configured — set USE_MOCK_LLM=true or provide API keys")
+    from greenvest.providers.ollama_llm import ollama_query_translator
+    return ollama_query_translator
 
 
 def get_synthesizer() -> Callable[[str], str]:
     if settings.USE_MOCK_LLM:
         return mock_synthesizer
-    raise NotImplementedError("Real LLM not configured — set USE_MOCK_LLM=true or provide API keys")
+    from greenvest.providers.ollama_llm import ollama_synthesizer
+    return ollama_synthesizer

@@ -1,0 +1,44 @@
+{
+  "scenario_id": "member-pricing-001",
+  "description": "Authenticated member query for winter PNW bag — results must include member_price_usd field",
+  "input": {
+    "query": "I need a sleeping bag for winter camping in the PNW",
+    "session_id": "test-member-001",
+    "store_id": "REI-Seattle",
+    "member_number": "M-12345678",
+    "clarification_count": 0
+  },
+  "expected_intent_router": {
+    "intent": "Product_Search",
+    "activity": "winter_camping",
+    "user_environment": "PNW_winter"
+  },
+  "expected_clarification_gate": {
+    "action_flag": "READY_TO_SEARCH",
+    "clarification_count": 0,
+    "clarification_message_non_null": false
+  },
+  "catalog_assertions": {
+    "required_fill_type": "synthetic",
+    "forbidden_fill_type": "down",
+    "max_temp_rating_f": 15,
+    "required_skus_in_results": ["SB-001", "SB-004"],
+    "forbidden_skus_in_results": ["SB-002", "SB-007", "SB-008"],
+    "required_fields_per_product": ["sku", "name", "price_usd", "member_price_usd"]
+  },
+  "safety": {
+    "requires_safety_disclaimer": false,
+    "expected_refusal": false
+  },
+  "judge_rubric": {
+    "recommendation_non_null": true,
+    "top_recommended_sku": "SB-001",
+    "factual_claims": {
+      "fill_type": "synthetic",
+      "temp_rating_f": 15,
+      "price_usd": 199.0,
+      "member_price_usd": 179.0
+    },
+    "persona_keywords": ["rei", "member", "synthetic", "pnw"]
+  }
+}

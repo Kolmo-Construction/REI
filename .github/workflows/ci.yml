@@ -1,0 +1,146 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # -------------------------------------------------------------------------
+  # Job 1: Deterministic node tests — no LLM, no Ollama, always fast
+  # -------------------------------------------------------------------------
+  unit-tests:
+    name: Deterministic node tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: astral-sh/setup-uv@v3
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Run deterministic node tests (no Ollama required)
+        run: uv run pytest tests/test_deterministic_nodes.py -v --tb=short
+
+  # -------------------------------------------------------------------------
+  # Job 2: Integration tests — real Ollama LLMs, mocked retrieval
+  # -------------------------------------------------------------------------
+  integration-tests:
+    name: Integration tests (Ollama)
+    runs-on: ubuntu-latest
+    needs: [unit-tests]
+
+    env:
+      USE_MOCK_LLM: "false"
+      OLLAMA_BASE_URL: "http://localhost:11434"
+      OLLAMA_ROUTER_MODEL: "llama3.2:latest"
+      OLLAMA_SYNTHESIZER_MODEL: "llama3:latest"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: astral-sh/setup-uv@v3
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Install Ollama
+        run: |
+          curl -fsSL https://ollama.com/install.sh | sh
+
+      - name: Start Ollama and pull models
+        run: |
+          ollama serve &
+          echo "Waiting for Ollama..."
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:11434/api/tags > /dev/null 2>&1; then
+              echo "Ollama is up."
+              break
+            fi
+            sleep 2
+          done
+          ollama pull llama3.2
+          ollama pull llama3
+
+      - name: Run integration tests
+        run: uv run pytest tests/test_vertical_slice.py tests/test_safety.py -v --tb=short
+
+      - name: Stop Ollama
+        if: always()
+        run: pkill ollama || true
+
+  # -------------------------------------------------------------------------
+  # Job 3: PromptFoo eval gate — PR only, uses Ollama for agent + Anthropic for judge
+  # -------------------------------------------------------------------------
+  eval-gate:
+    name: PromptFoo eval gate
+    runs-on: ubuntu-latest
+    needs: [integration-tests]
+    if: github.event_name == 'pull_request'
+
+    env:
+      USE_MOCK_LLM: "false"
+      OLLAMA_BASE_URL: "http://localhost:11434"
+      OLLAMA_ROUTER_MODEL: "llama3.2:latest"
+      OLLAMA_SYNTHESIZER_MODEL: "llama3:latest"
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: astral-sh/setup-uv@v3
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Install Ollama
+        run: curl -fsSL https://ollama.com/install.sh | sh
+
+      - name: Start Ollama and pull models
+        run: |
+          ollama serve &
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:11434/api/tags > /dev/null 2>&1 && break
+            sleep 2
+          done
+          ollama pull llama3.2
+          ollama pull llama3
+
+      - name: Install Node.js and PromptFoo
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - run: npm install -g promptfoo
+
+      - name: Start eval server
+        run: |
+          uv run uvicorn eval.serve:app --host 0.0.0.0 --port 8080 &
+          for i in $(seq 1 20); do
+            curl -sf http://localhost:8080/health > /dev/null 2>&1 && break
+            sleep 1
+          done
+
+      - name: Run PromptFoo evaluation
+        run: promptfoo eval --config promptfoo.yaml --no-cache
+
+      - name: Cleanup
+        if: always()
+        run: |
+          kill $(lsof -t -i:8080) 2>/dev/null || true
+          pkill ollama || true

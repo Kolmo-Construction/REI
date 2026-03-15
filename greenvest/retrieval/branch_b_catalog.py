@@ -1,120 +1,170 @@
 """
-Branch B: Product Catalog retrieval.
-Vertical slice uses flat JSON + simple scoring.
-Production: swap for Weaviate hybrid search (RRF) — interface is identical.
+Branch B — Product Catalog Retrieval.
+
+Phase 11: Qdrant hybrid search (SPLADE sparse + BAAI/bge-large-en-v1.5 dense, server-side RRF).
+Interface is identical to the Phase 6 flat-JSON version — no callers changed.
 """
 from __future__ import annotations
-import json
+import asyncio
 import re
-from pathlib import Path
-from typing import TYPE_CHECKING
+from functools import lru_cache
+from typing import Optional
 
 import structlog
+from qdrant_client import AsyncQdrantClient, models
+from qdrant_client.models import SparseVector
+from fastembed import SparseTextEmbedding, TextEmbedding
 
-if TYPE_CHECKING:
-    from greenvest.state import GreenvestState
+from greenvest.config import settings
+from greenvest.state import GreenvestState
 
 log = structlog.get_logger(__name__)
 
-_CATALOG: list[dict] = []
+COLLECTION_NAME = "rei_products"
+DENSE_MODEL = "BAAI/bge-large-en-v1.5"
+DENSE_DIM = 1024
+
+# Common outdoor brand tokens — triggers sparse-heavy RRF weighting
+_BRAND_TOKENS = {
+    "rei", "patagonia", "north face", "tnf", "black diamond",
+    "petzl", "arcteryx", "arc'teryx", "marmot", "osprey", "deuter",
+    "gregory", "msr", "big agnes", "nemo", "sea to summit",
+    "jetboil", "garmin", "suunto", "salomon", "scarpa", "la sportiva",
+    "gore-tex", "goretex", "primaloft", "polartec",
+    "therm-a-rest", "thermarest", "western mountaineering", "kelty", "nemo",
+    "merrell",
+}
 
 
-def _load_catalog() -> list[dict]:
-    path = Path(__file__).parent.parent.parent / "data" / "sample_products.json"
-    with open(path) as f:
-        return json.load(f)
+@lru_cache(maxsize=1)
+def _sparse_model() -> SparseTextEmbedding:
+    return SparseTextEmbedding(model_name="prithivida/Splade_PP_en_v1")
 
 
-def _get_catalog() -> list[dict]:
-    global _CATALOG
-    if not _CATALOG:
-        _CATALOG = _load_catalog()
-    return _CATALOG
+@lru_cache(maxsize=1)
+def _dense_model() -> TextEmbedding:
+    return TextEmbedding(model_name=DENSE_MODEL)
 
 
-def _parse_numeric_constraint(value: str) -> tuple[str, float] | None:
-    """Parse '>= 4.5', '<32', '<=15' → (operator, number)."""
-    m = re.match(r"(>=|<=|>|<|==?)?\s*(-?\d+(?:\.\d+)?)", str(value))
-    if not m:
-        return None
-    op = m.group(1) or "=="
-    num = float(m.group(2))
-    return op, num
+def _qdrant() -> AsyncQdrantClient:
+    return AsyncQdrantClient(url=settings.QDRANT_URL)
 
 
-def _numeric_match(product_val, constraint: str) -> bool:
-    if product_val is None:
-        return False
-    parsed = _parse_numeric_constraint(constraint)
-    if parsed is None:
-        return False
-    op, target = parsed
-    pv = float(product_val)
-    return {
-        ">=": pv >= target,
-        "<=": pv <= target,
-        ">": pv > target,
-        "<": pv < target,
-        "==": pv == target,
-        "=": pv == target,
-    }.get(op, False)
+def _detect_brand_token(query: str) -> bool:
+    q = query.lower()
+    return any(brand in q for brand in _BRAND_TOKENS)
 
 
-def _score_product(product: dict, derived_specs: list[dict]) -> float:
-    """
-    Simple relevance score: +1 per matched spec.
-    Production will replace with RRF scores from Weaviate.
-    """
-    score = 0.0
+def _build_filter(derived_specs: list[dict]) -> Optional[models.Filter]:
+    """Convert derived_specs into a Qdrant Filter applied during ANN traversal (pre-filtering)."""
+    conditions = []
+    numeric_fields = {"temp_rating_f", "r_value", "weight_oz"}
+    keyword_fields = {"fill_type", "water_resistance"}
+
     for spec in derived_specs:
         for key, value in spec.items():
-            prod_val = product.get(key)
-            if prod_val is None:
+            if key not in numeric_fields | keyword_fields:
                 continue
-            v_str = str(value).lower()
 
-            # Numeric constraint
-            if any(op in v_str for op in [">=", "<=", ">", "<"]):
-                if _numeric_match(prod_val, v_str):
-                    score += 1.0
-            # String / categorical match (supports "a OR b" alternatives)
-            elif " or " in v_str:
-                alternatives = [a.strip() for a in v_str.split(" or ")]
-                if str(prod_val).lower() in alternatives:
-                    score += 1.0
-            else:
-                if str(prod_val).lower() == v_str:
-                    score += 1.0
+            if key in numeric_fields and isinstance(value, str):
+                m = re.match(r"^([<>]=?)(-?\d+\.?\d*)$", value.strip())
+                if m:
+                    op, num = m.group(1), float(m.group(2))
+                    range_kwargs: dict = {}
+                    if op == "<=": range_kwargs["lte"] = num
+                    elif op == ">=": range_kwargs["gte"] = num
+                    elif op == "<":  range_kwargs["lt"] = num
+                    elif op == ">":  range_kwargs["gt"] = num
+                    conditions.append(
+                        models.FieldCondition(key=key, range=models.Range(**range_kwargs))
+                    )
 
-    return score
+            elif key in keyword_fields and isinstance(value, str):
+                if " OR " in value:
+                    options = [v.strip() for v in value.split(" OR ")]
+                    conditions.append(
+                        models.FieldCondition(key=key, match=models.MatchAny(any=options))
+                    )
+                else:
+                    conditions.append(
+                        models.FieldCondition(key=key, match=models.MatchValue(value=value))
+                    )
+
+    return models.Filter(must=conditions) if conditions else None
 
 
-async def search_catalog(state: "GreenvestState") -> list[dict]:
+def _build_query_document(state: GreenvestState) -> str:
+    """Enrich the raw query with extracted state for better ANN precision."""
+    parts = [state.get("query", "")]
+    if state.get("activity"):
+        parts.append(state["activity"].replace("_", " "))
+    if state.get("user_environment"):
+        parts.append(state["user_environment"].replace("_", " "))
+    for spec in state.get("derived_specs", []):
+        for k, v in spec.items():
+            parts.append(f"{k}: {v}")
+    return ". ".join(p for p in parts if p)
+
+
+async def search_catalog(state: GreenvestState) -> list[dict]:
     """
-    Production-compatible async interface.
-    Returns top-5 products scored against derived_specs.
-    Weaviate hybrid search replaces this in Phase 11.
+    Hybrid search: SPLADE sparse + BAAI/bge-large-en-v1.5 dense, fused server-side via RRF.
+    Returns top 5 products as dicts (same shape as sample_products.json).
     """
-    derived_specs = state.get("derived_specs", [])
-    catalog = _get_catalog()
+    query_doc = _build_query_document(state)
+    spec_filter = _build_filter(state.get("derived_specs", []))
 
-    scored = [
-        (product, _score_product(product, derived_specs))
-        for product in catalog
-    ]
-    scored.sort(key=lambda x: x[1], reverse=True)
+    # Dense and sparse embeddings generated concurrently (both run in executor — CPU-bound)
+    loop = asyncio.get_event_loop()
+    dense_task = loop.run_in_executor(
+        None,
+        lambda: list(_dense_model().embed([query_doc]))[0],
+    )
+    sparse_task = loop.run_in_executor(
+        None,
+        lambda: list(_sparse_model().embed([query_doc]))[0],
+    )
 
-    results = [p for p, s in scored if s > 0][:5]
+    dense_result, sparse_result = await asyncio.gather(dense_task, sparse_task)
+    dense_vec = dense_result.tolist()
+    sparse_vec = SparseVector(
+        indices=sparse_result.indices.tolist(),
+        values=sparse_result.values.tolist(),
+    )
 
-    # Fallback: if nothing matched, return top 5 by catalog order (broad fallback)
-    if not results:
-        results = catalog[:5]
+    # Brand queries favor sparse (exact token match dominates)
+    has_brand = _detect_brand_token(state.get("query", ""))
+    sparse_weight, dense_weight = (2.0, 1.0) if has_brand else (1.0, 2.0)
+
+    results = await _qdrant().query_points(
+        collection_name=COLLECTION_NAME,
+        prefetch=[
+            models.Prefetch(
+                query=sparse_vec,
+                using="sparse_text",
+                filter=spec_filter,
+                limit=50,
+            ),
+            models.Prefetch(
+                query=dense_vec,
+                using="dense_text",
+                filter=spec_filter,
+                limit=50,
+            ),
+        ],
+        query=models.RrfQuery(rrf=models.Rrf(weights=[sparse_weight, dense_weight])),
+        limit=5,
+        with_payload=True,
+    )
+
+    hits = [point.payload for point in results.points]
 
     log.info(
         "branch_b_catalog",
         session_id=state["session_id"],
-        total_candidates=len(catalog),
-        matched=len(results),
-        top_score=scored[0][1] if scored else 0,
+        matched=len(hits),
+        brand_query=has_brand,
+        filter_active=spec_filter is not None,
     )
-    return results
+
+    return hits

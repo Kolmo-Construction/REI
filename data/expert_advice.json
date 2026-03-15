@@ -1,0 +1,170 @@
+[
+  {
+    "url": "internal://expert-advice/sleeping-bags/how-to-choose",
+    "title": "How to Choose a Sleeping Bag",
+    "section": "Temperature Rating",
+    "category": "sleeping_bags",
+    "chunk_text": "Temperature rating is the most important spec when choosing a sleeping bag. A bag's rating tells you the lowest temperature at which a typical sleeper will stay warm. For winter camping, especially in the PNW or alpine environments, choose a bag rated at 15°F or lower. For three-season backpacking, a 30°F to 20°F bag covers most conditions. Always size down — it's easier to vent a warmer bag than to stay warm in one that's too light. Cold sleepers should go one rating colder than the expected low temperature.",
+    "source": "synthetic"
+  },
+  {
+    "url": "internal://expert-advice/sleeping-bags/how-to-choose",
+    "title": "How to Choose a Sleeping Bag",
+    "section": "Down vs Synthetic Fill",
+    "category": "sleeping_bags",
+    "chunk_text": "Down fill is lighter and more compressible than synthetic, making it ideal for backpacking where weight and pack size matter. However, down loses nearly all insulating ability when wet. Synthetic fill retains warmth even when damp, dries faster, and is generally less expensive. For wet climates like the Pacific Northwest, coastal ranges, or any multi-day trip where rain is likely, synthetic or hydrophobic down is strongly recommended. Hydrophobic down is treated to resist moisture and performs better than untreated down in damp conditions, though still not as well as fully synthetic fill.",
+    "source": "synthetic"
+  },
+  {
+    "url": "internal://expert-advice/sleeping-bags/how-to-choose",
+    "title": "How to Choose a Sleeping Bag",
+    "section": "Sleeping Bag Weight and Packability",
+    "category": "sleeping_bags",
+    "chunk_text": "For backpacking, aim for a sleeping bag under 2 lbs (32 oz) for three-season use and under 3 lbs (48 oz) for winter. Car campers can prioritize comfort and warmth over weight. Ultralight backpackers and thru-hikers often target bags under 20 oz for summer use. Packability is closely tied to fill type — down compresses into much smaller stuff sacks than synthetic, which matters when every liter of pack space counts on long routes.",
+    "source": "synthetic"
+  },
+  {
+    "url": "internal://expert-advice/sleeping-bags/winter-camping",
+    "title": "Winter Camping Sleep System Guide",
+    "section": "Layering Your Sleep System",
+    "category": "sleeping_bags",
+    "chunk_text": "In winter conditions, your sleep system is more than just your bag — it's a layered system. Pair a 0°F to 15°F rated sleeping bag with a high R-value sleeping pad (R-4 or higher) to prevent heat loss through the ground. Wear a dry baselayer and dry socks to bed. A sleeping bag liner adds 5–15°F of warmth and keeps the bag cleaner. Never sleep in wet clothes — change into dry layers before getting in the bag even if it feels cold. Your body heat will warm the bag faster in dry clothing.",
+    "source": "synthetic"
+  },
+  {
+    "url": "internal://expert-advice/sleeping-bags/winter-camping",
+    "title": "Winter Camping Sleep System Guide",
+    "section": "PNW and Wet Climate Considerations",
+    "category": "sleeping_bags",
+    "chunk_text": "The Pacific Northwest presents a unique challenge: temperatures are rarely extreme but persistent moisture is constant. A sleeping bag that performs at 25°F in Colorado may feel inadequate at 35°F in a wet PNW tent. Prioritize synthetic or hydrophobic down fill. Look for bags with DWR-treated shells to bead water off the exterior. Store your bag in a dry sack inside your pack. Air out your bag every morning — moisture from breath accumulates in the fill over multiple nights and degrades insulation performance.",
+    "source": "synthetic"
+  },
+  {
+    "url": "internal://expert-advice/sleeping-pads/how-to-choose",
+    "title": "How to Choose a Sleeping Pad",
+    "section": "Understanding R-Value",
+    "category": "sleeping_pads",
+    "chunk_text": "R-value measures a sleeping pad's resistance to heat flow — the higher the number, the better the insulation from the cold ground. For winter camping or snow camping, choose a pad with R-4 or higher. For three-season backpacking, R-2 to R-3.5 is typically sufficient. For summer camping in warm conditions, R-1 to R-2 is adequate. R-values are additive — stacking a foam pad (R-2) under an inflatable pad (R-3) gives you roughly R-5, a common winter strategy to boost warmth without buying a new pad.",
+    "source": "synthetic"
+  },
+  {
+    "url": "internal://expert-advice/sleeping-pads/how-to-choose",
+    "title": "How to Choose a Sleeping Pad",
+    "section": "Inflatable vs Foam Pads",
+    "category": "sleeping_pads",
+    "chunk_text": "Inflatable sleeping pads offer superior comfort and packability, compressing to the size of a water bottle while providing the highest R-values per ounce. They require more care to avoid punctures and must be inflated each night. Foam pads like the Therm-a-Rest Z Lite are virtually indestructible, double as a sit pad, and never need inflation — popular with thru-hikers for their reliability. Foam pads are bulkier but can be strapped to the outside of a pack. For most backpackers, an inflatable pad offers the best balance of warmth, weight, and comfort.",
+    "source": "synthetic"
+  },
+  {
+    "url": "internal://expert-advice/sleeping-pads/how-to-choose",
+    "title": "How to Choose a Sleeping Pad",
+    "section": "Weight and Size for Backpacking",
+    "category": "sleeping_pads",
+    "chunk_text": "Sleeping pad weight matters on long trips. Ultralight inflatable pads like the Therm-a-Rest NeoAir XTherm weigh under 1 lb while delivering R-values above 7, making them the top choice for alpine and winter backpacking where every ounce counts. Regular backpacking pads range from 14 to 24 oz. Car campers can use large, heavy foam pads or even self-inflating mattresses for maximum comfort without weight penalty. For bikepacking or packrafting, look for pads that compress small enough to fit inside frame bags.",
+    "source": "synthetic"
+  },
+  {
+    "url": "internal://expert-advice/jackets/rain-jackets",
+    "title": "How to Choose a Rain Jacket",
+    "section": "Waterproof vs Water-Resistant",
+    "category": "jackets",
+    "chunk_text": "Waterproof jackets use a membrane — most commonly GORE-TEX — bonded to the shell fabric to block rain completely. Water-resistant jackets use a DWR (durable water repellent) coating that beads light rain but will eventually saturate in sustained downpours. For the Pacific Northwest, consistent heavy rain, or any activity where staying dry is critical, choose a fully waterproof jacket with a membrane. Water-resistant jackets are fine for dry climates or as a wind layer. DWR coatings wear off over time and can be restored by washing and tumble drying on low heat.",
+    "source": "synthetic"
+  },
+  {
+    "url": "internal://expert-advice/jackets/rain-jackets",
+    "title": "How to Choose a Rain Jacket",
+    "section": "Breathability and Layering",
+    "category": "jackets",
+    "chunk_text": "Breathability is how well a jacket vents moisture from exertion. High-output activities like trail running or uphill hiking demand highly breathable shells — look for 2.5-layer or 3-layer GORE-TEX constructions or similar membranes. For casual hiking or travel, a less breathable jacket is fine and often more affordable. Pit zips and chest vents help dump heat quickly during aerobic efforts. A rain jacket should fit over a midlayer fleece — try it on in-store with your intended layering system. It should be roomy in the shoulders and arms for full movement.",
+    "source": "synthetic"
+  },
+  {
+    "url": "internal://expert-advice/jackets/insulated",
+    "title": "Insulated Jacket Buying Guide",
+    "section": "Synthetic vs Down Insulation",
+    "category": "jackets",
+    "chunk_text": "Insulated jackets fall into two categories: down and synthetic. Down jackets offer the best warmth-to-weight ratio and compress into tiny stuff sacks, ideal for alpine climbing or as a packable layer on backpacking trips. Synthetic insulated jackets like the Patagonia Nano Puff maintain warmth when wet and dry quickly, making them the better choice for wet environments or high-output activities. A synthetic insulated jacket can often replace both a fleece midlayer and a down layer in PNW conditions where moisture is constant.",
+    "source": "synthetic"
+  },
+  {
+    "url": "internal://expert-advice/jackets/insulated",
+    "title": "Insulated Jacket Buying Guide",
+    "section": "When to Wear an Insulated Jacket",
+    "category": "jackets",
+    "chunk_text": "An insulated jacket is a static warmth layer — it's designed for when you stop moving, not for aerobic activity. Use it at camp, at belay stations, on summit breaks, or as your outer layer on cold but dry days. During high-output hiking or climbing, a fleece midlayer is usually better as it breathes more effectively and won't overheat you. The best system for variable mountain conditions: moisture-wicking base layer, fleece or softshell midlayer, insulated jacket for stops, hardshell rain jacket over everything.",
+    "source": "synthetic"
+  },
+  {
+    "url": "internal://expert-advice/backpacks/how-to-choose",
+    "title": "How to Choose a Backpacking Pack",
+    "section": "Volume: How Many Liters Do You Need",
+    "category": "backpacks",
+    "chunk_text": "Pack volume is measured in liters. For overnight and weekend trips, 40–55L is the sweet spot — enough for sleeping gear, clothing, food, and shelter without encouraging overpacking. For trips of 4+ days, 60–70L gives you space for more food and gear without going excessive. Thru-hikers often run 35–50L packs by using ultralight gear systems. A 55L pack like the REI Flash 55 handles most backpacking scenarios. Avoid buying too large — a half-empty 80L pack is uncomfortable and encourages bringing unnecessary gear.",
+    "source": "synthetic"
+  },
+  {
+    "url": "internal://expert-advice/backpacks/how-to-choose",
+    "title": "How to Choose a Backpacking Pack",
+    "section": "Fit and Frame",
+    "category": "backpacks",
+    "chunk_text": "Proper pack fit is the most important factor in comfort on long trips. Measure your torso length from the C7 vertebra to the iliac crest — not your height — to find the right frame size. An internal frame pack transfers weight to the hips; 80% of the load should sit on your hips, not your shoulders. Packs like the Osprey Atmos AG use a suspended mesh back panel to separate your back from the pack, dramatically improving airflow and comfort on hot days. Always fit a pack loaded with weight before buying — an empty pack feels fine; a loaded one reveals pressure points.",
+    "source": "synthetic"
+  },
+  {
+    "url": "internal://expert-advice/backpacks/how-to-choose",
+    "title": "How to Choose a Backpacking Pack",
+    "section": "Weight: Ultralight vs Traditional",
+    "category": "backpacks",
+    "chunk_text": "Traditional backpacking packs prioritize comfort features — padded hipbelts, load lifters, external pockets — and weigh 4–6 lbs. Ultralight packs strip these features down to 1–2 lbs, requiring the hiker to carry less total weight to compensate. A good rule: your loaded pack should not exceed 20–25% of your body weight for a comfortable trip. If you're carrying heavy gear, a heavier pack with a better suspension system will be more comfortable than a frameless ultralight pack. Build your ultralight system from the ground up — sleeping bag, pad, and shelter — before investing in an ultralight pack.",
+    "source": "synthetic"
+  },
+  {
+    "url": "internal://expert-advice/footwear/hiking-boots",
+    "title": "How to Choose Hiking Boots and Shoes",
+    "section": "Boots vs Trail Runners vs Shoes",
+    "category": "footwear",
+    "chunk_text": "Hiking footwear ranges from lightweight trail runners to heavy leather boots. Trail runners are fast, dry quickly, and work well for day hikes and thru-hiking with ultralight packs. Midcut hiking boots like the Merrell Moab or Salomon X Ultra add ankle support and are the most versatile option for weekend backpacking on maintained trails. Full-height leather or stiff synthetic boots are best for heavy loads, off-trail scrambling, or conditions requiring crampon compatibility. Most hikers doing established trails with moderate loads do best in a midcut waterproof boot.",
+    "source": "synthetic"
+  },
+  {
+    "url": "internal://expert-advice/footwear/hiking-boots",
+    "title": "How to Choose Hiking Boots and Shoes",
+    "section": "Waterproofing: GORE-TEX and Alternatives",
+    "category": "footwear",
+    "chunk_text": "Waterproof hiking boots use membranes — GORE-TEX being the most common — to block water from entering while allowing some vapor to escape. For wet climates like the Pacific Northwest, waterproof boots are essential for trail hiking in rain and stream crossings. The tradeoff: waterproof boots are less breathable than non-waterproof versions and take much longer to dry when they do get soaked through the top. For dry climates or hot-weather hiking, non-waterproof mesh boots are more comfortable. GORE-TEX boots also run slightly warmer, which is a feature in cold conditions and a liability in summer heat.",
+    "source": "synthetic"
+  },
+  {
+    "url": "internal://expert-advice/footwear/hiking-boots",
+    "title": "How to Choose Hiking Boots and Shoes",
+    "section": "Fit and Break-In",
+    "category": "footwear",
+    "chunk_text": "Fit is everything in hiking footwear. Try on boots in the afternoon when feet are slightly swollen, and wear the socks you plan to hike in. There should be a thumb's width of space between your longest toe and the end of the boot — toes hitting the front cause black toenails on descents. The heel should lock in place with no slipping. Leather boots require significant break-in time — start with short walks before taking them on a long trip. Synthetic and mesh boots typically need little break-in. Lacing technique matters: lock the heel before lacing the forefoot to prevent blisters.",
+    "source": "synthetic"
+  },
+  {
+    "url": "internal://expert-advice/layering/system",
+    "title": "The Layering System for Outdoor Activities",
+    "section": "Base Layer: Moisture Management",
+    "category": "jackets",
+    "chunk_text": "The base layer sits against your skin and its primary job is moisture management — moving sweat away from your body to keep you dry and regulate temperature. Merino wool is the premium choice: naturally odor-resistant, soft, and effective across a wide temperature range. Synthetic polyester base layers dry faster than wool and are typically less expensive. Cotton is a poor base layer choice for any active outdoor use — it absorbs moisture and holds it against your skin, dramatically increasing heat loss in cold conditions. The saying 'cotton kills' is most relevant to base layer selection in cold or wet weather.",
+    "source": "synthetic"
+  },
+  {
+    "url": "internal://expert-advice/layering/system",
+    "title": "The Layering System for Outdoor Activities",
+    "section": "Midlayer: Insulation and Warmth",
+    "category": "jackets",
+    "chunk_text": "The midlayer traps warm air and provides insulation. Fleece is the classic midlayer — it breathes well during aerobic activity and dries quickly. Softshell jackets combine wind and light water resistance with enough stretch for active movement, blurring the line between midlayer and shell. Insulated midlayers (down or synthetic puffy) work best as static warmth — at the belay, at camp, or on cold days with low exertion. For high-output activities in variable conditions, a zippered fleece midlayer that can be opened to dump heat is the most versatile option.",
+    "source": "synthetic"
+  },
+  {
+    "url": "internal://expert-advice/layering/system",
+    "title": "The Layering System for Outdoor Activities",
+    "section": "Outer Shell: Weather Protection",
+    "category": "jackets",
+    "chunk_text": "The outer shell protects against wind, rain, and snow. Hardshells are fully waterproof and windproof — essential for sustained precipitation, alpine routes, or exposed ridgelines. Softshells offer better breathability and stretch but limited water resistance — appropriate for dry cold conditions or high-output activities where moisture comes from sweat rather than rain. In the Pacific Northwest and other wet climates, a waterproof hardshell is non-negotiable as your outer layer. The shell should be large enough to fit your base and midlayer underneath without restricting movement.",
+    "source": "synthetic"
+  }
+]

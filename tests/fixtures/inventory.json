@@ -1,0 +1,24 @@
+{
+  "REI-Seattle": {
+    "SB-001": {"store_stock_qty": 5, "online_stock_qty": 20},
+    "SB-002": {"store_stock_qty": 0, "online_stock_qty": 8},
+    "SB-003": {"store_stock_qty": 3, "online_stock_qty": 12},
+    "SB-004": {"store_stock_qty": 2, "online_stock_qty": 15},
+    "SB-005": {"store_stock_qty": 4, "online_stock_qty": 10},
+    "SB-009": {"store_stock_qty": 7, "online_stock_qty": 25},
+    "SP-001": {"store_stock_qty": 3, "online_stock_qty": 10},
+    "SP-002": {"store_stock_qty": 1, "online_stock_qty": 6},
+    "JK-001": {"store_stock_qty": 8, "online_stock_qty": 30},
+    "JK-002": {"store_stock_qty": 0, "online_stock_qty": 12},
+    "FW-001": {"store_stock_qty": 5, "online_stock_qty": 18},
+    "FW-002": {"store_stock_qty": 6, "online_stock_qty": 22}
+  },
+  "REI-Portland": {
+    "SB-001": {"store_stock_qty": 0, "online_stock_qty": 20},
+    "SB-004": {"store_stock_qty": 0, "online_stock_qty": 15},
+    "SB-005": {"store_stock_qty": 2, "online_stock_qty": 10},
+    "SP-001": {"store_stock_qty": 1, "online_stock_qty": 10},
+    "JK-001": {"store_stock_qty": 3, "online_stock_qty": 30},
+    "FW-002": {"store_stock_qty": 4, "online_stock_qty": 22}
+  }
+}
