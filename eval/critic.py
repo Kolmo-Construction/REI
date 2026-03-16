@@ -446,9 +446,30 @@ async def analyze_failures(
             print(f"[Critic] {scenario_id}: LLM call failed — skipping.", file=sys.stderr)
             continue
 
-        target_node = raw_result.get("target_node", "synthesizer")
-        fix_type = raw_result.get("suggested_fix_type", "patch_prompt")
-        target_file = _NODE_TO_FILE.get(target_node, _NODE_TO_FILE["synthesizer"])
+        target_node = raw_result.get("target_node")
+        fix_type = raw_result.get("suggested_fix_type")
+
+        _VALID_NODES = frozenset(_NODE_TO_FILE)
+        _VALID_FIX_TYPES = frozenset({"patch_prompt", "update_ontology", "patch_phrase_list"})
+
+        if not target_node or target_node not in _VALID_NODES:
+            print(
+                f"[Critic] {scenario_id}: LLM returned invalid or missing 'target_node' "
+                f"({target_node!r}) — skipping gradient. "
+                f"Valid nodes: {sorted(_VALID_NODES)}",
+                file=sys.stderr,
+            )
+            continue
+        if not fix_type or fix_type not in _VALID_FIX_TYPES:
+            print(
+                f"[Critic] {scenario_id}: LLM returned invalid or missing 'suggested_fix_type' "
+                f"({fix_type!r}) — skipping gradient. "
+                f"Valid types: {sorted(_VALID_FIX_TYPES)}",
+                file=sys.stderr,
+            )
+            continue
+
+        target_file = _NODE_TO_FILE[target_node]
         confidence = float(raw_result.get("confidence", 0.5))
 
         # Skip if this key has been attempted max_retries_per_fix times already

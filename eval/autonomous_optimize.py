@@ -133,10 +133,22 @@ async def _run_eval(
 
 
 def _git_revert(files: list[str]) -> None:
-    """Revert editable files to last committed state."""
+    """Revert editable files to last committed state.
+
+    Raises
+    ------
+    RuntimeError if git checkout fails — the caller should abort the loop rather
+    than continuing with corrupted edits in the working tree.
+    """
     cmd = ["git", "checkout", "--"] + files
     print(f"[Revert] {' '.join(cmd)}")
-    subprocess.run(cmd, cwd=str(REPO_ROOT), check=False)
+    result = subprocess.run(cmd, cwd=str(REPO_ROOT), check=False)
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"[FATAL] git revert failed (exit {result.returncode}). "
+            "Working tree may have unreverted edits. "
+            "Run `git checkout -- .` manually before resuming."
+        )
 
 
 def _record_tried_fixes(
@@ -307,17 +319,32 @@ async def run_autonomous_loop(
     if resume:
         state = _load_state()
         if state:
-            current_baseline_path = state["baseline_path"]
-            baseline_data = _load_results(Path(current_baseline_path))
-            baseline_composite = state["baseline_composite"]
-            experiment_count = state["experiment_count"]
-            tried_fixes = {tuple(t) for t in state.get("tried_fixes", [])}  # type: ignore[misc]
-            print(
-                f"[Resume] Restored state from {LOOP_STATE_PATH}: "
-                f"experiment={experiment_count}, "
-                f"composite={baseline_composite}, "
-                f"tried_fixes={len(tried_fixes)}"
-            )
+            try:
+                _validate_state(state)
+                current_baseline_path = state["baseline_path"]
+                baseline_path_obj = Path(current_baseline_path)
+                if not baseline_path_obj.exists():
+                    raise ValueError(
+                        f"baseline_path '{current_baseline_path}' in loop_state.json "
+                        "does not exist on disk."
+                    )
+                baseline_data = json.loads(baseline_path_obj.read_text())
+                baseline_composite = state["baseline_composite"]
+                experiment_count = int(state["experiment_count"])
+                tried_fixes = {tuple(t) for t in state.get("tried_fixes", [])}  # type: ignore[misc]
+                print(
+                    f"[Resume] Restored state from {LOOP_STATE_PATH}: "
+                    f"experiment={experiment_count}, "
+                    f"composite={baseline_composite}, "
+                    f"tried_fixes={len(tried_fixes)}"
+                )
+            except (KeyError, TypeError, ValueError) as exc:
+                print(
+                    f"[WARN] Loop state is invalid and will be ignored: {exc} "
+                    "Starting fresh.",
+                    file=sys.stderr,
+                )
+                resume = False
         else:
             print(
                 "[WARN] --resume specified but no state file found; starting fresh.",
@@ -551,6 +578,7 @@ def _save_state(
     """Persist loop state to disk so the session can be resumed after a crash."""
     LOOP_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
     state = {
+        "version": 1,
         "experiment_count": experiment_count,
         "baseline_composite": baseline_composite,
         "baseline_path": baseline_path,
@@ -558,8 +586,36 @@ def _save_state(
         "tried_fixes": [list(t) for t in tried_fixes],
         "saved_at": _timestamp(),
     }
-    LOOP_STATE_PATH.write_text(json.dumps(state, indent=2), encoding="utf-8")
+    # Atomic write: write to a temp file then rename so a crash mid-write
+    # never leaves a partially-written (corrupt) state file.
+    tmp_path = LOOP_STATE_PATH.with_suffix(".json.tmp")
+    tmp_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
+    tmp_path.replace(LOOP_STATE_PATH)
     print(f"[State] Saved -> {LOOP_STATE_PATH}")
+
+
+def _validate_state(state: dict) -> None:
+    """Validate that a loaded loop_state dict has the required fields and types.
+
+    Raises ValueError with a descriptive message on the first validation failure
+    so the caller can fall through to a fresh start rather than crash on a KeyError.
+    """
+    required = {
+        "baseline_path": str,
+        "baseline_composite": (float, int, type(None)),
+        "experiment_count": int,
+    }
+    for field, expected_types in required.items():
+        if field not in state:
+            raise ValueError(f"Required field '{field}' missing from loop_state.json.")
+        val = state[field]
+        if not isinstance(val, expected_types):
+            raise ValueError(
+                f"Field '{field}' has unexpected type {type(val).__name__} "
+                f"(expected {expected_types})."
+            )
+    if not isinstance(state.get("tried_fixes", []), list):
+        raise ValueError("'tried_fixes' must be a list.")
 
 
 def _load_state() -> dict | None:

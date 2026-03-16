@@ -323,6 +323,22 @@ def _apply_patch_prompt(plan: dict, gradient: TextualGradient) -> ApplyResult:
                            error="'new_value' missing or not a string in optimizer plan.")
 
     target_path = REPO_ROOT / gradient.target_file
+
+    # Pre-validate that the variable actually exists in the target file before
+    # calling patch_prompt, so a hallucinated node_name is caught early and
+    # reported clearly rather than as a mid-edit EditError.
+    try:
+        existing = read_node_value(str(target_path), node_name)
+    except Exception as exc:
+        return ApplyResult(False, "", "patch_prompt", gradient.target_file,
+                           error=f"Could not read '{node_name}' from {gradient.target_file}: {exc}")
+    if existing is None:
+        return ApplyResult(False, "", "patch_prompt", gradient.target_file,
+                           error=(
+                               f"Variable '{node_name}' not found in {gradient.target_file}. "
+                               "The LLM may have hallucinated the variable name."
+                           ))
+
     try:
         old_value = patch_prompt(str(target_path), node_name, new_value)
         return ApplyResult(
