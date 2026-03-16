@@ -547,8 +547,10 @@ async def generate_and_apply_all(
     for gradient in sorted(unique, key=lambda g: g.confidence, reverse=True):
         if applied >= max_edits:
             break
-        attempted.append(gradient)
         result = await generate_and_apply(gradient)
+        # Record gradient as attempted only AFTER the call so that a crash or
+        # exception mid-apply does not permanently blacklist the gradient.
+        attempted.append(gradient)
         results.append(result)
         if result.success:
             applied += 1

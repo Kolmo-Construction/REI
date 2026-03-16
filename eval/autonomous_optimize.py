@@ -64,6 +64,13 @@ SAFETY_FLOOR = 0.70
 # Maximum seconds to wait for a single eval.py run before killing it.
 EVAL_TIMEOUT_SECONDS = 300
 
+# Backoff for consecutive eval failures: wait 5 s, 10 s, 20 s then abort.
+_EVAL_BACKOFF_BASE = 5.0
+_MAX_CONSECUTIVE_EVAL_FAILURES = 3
+
+# Gradients with confidence below this are skipped before calling the optimizer.
+GRADIENT_CONFIDENCE_THRESHOLD = 0.40
+
 
 # ---------------------------------------------------------------------------
 # Error types
@@ -168,14 +175,22 @@ def _record_tried_fixes(
 
 
 def _git_commit(files: list[str], message: str) -> bool:
-    """Stage editable files and create a commit. Returns True on success."""
+    """Stage editable files and create a commit.
+
+    Returns True on success.  On any failure the edits are reverted via
+    _git_revert so the working tree is always clean when this returns False.
+    """
     add_result = subprocess.run(
         ["git", "add"] + files,
         cwd=str(REPO_ROOT),
         check=False,
     )
     if add_result.returncode != 0:
-        print("[WARN] git add failed — changes kept in working tree but not committed.", file=sys.stderr)
+        print(
+            "[WARN] git add failed — reverting edits to keep working tree clean.",
+            file=sys.stderr,
+        )
+        _git_revert(files)
         return False
     commit_result = subprocess.run(
         ["git", "commit", "-m", message],
@@ -183,7 +198,11 @@ def _git_commit(files: list[str], message: str) -> bool:
         check=False,
     )
     if commit_result.returncode != 0:
-        print("[WARN] git commit failed — changes kept in working tree but not committed.", file=sys.stderr)
+        print(
+            "[WARN] git commit failed — reverting edits to keep working tree clean.",
+            file=sys.stderr,
+        )
+        _git_revert(files)
         return False
     return True
 
@@ -394,6 +413,8 @@ async def run_autonomous_loop(
         f"{'='*60}\n"
     )
 
+    consecutive_eval_failures = 0
+
     while experiment_count < max_experiments:
         # Early-stop if target already met
         if baseline_composite is not None and baseline_composite >= target_composite:
@@ -432,6 +453,27 @@ async def run_autonomous_loop(
                 )
             experiment_count += 1
             continue
+
+        # ── Confidence filter ─────────────────────────────────────────────
+        high_confidence = [g for g in gradients if g.confidence >= GRADIENT_CONFIDENCE_THRESHOLD]
+        if not high_confidence:
+            print(
+                f"[Experiment {exp_num}] All {len(gradients)} gradient(s) are below "
+                f"confidence threshold ({GRADIENT_CONFIDENCE_THRESHOLD}) — "
+                "skipping optimizer to avoid low-signal edits.",
+                file=sys.stderr,
+            )
+            experiment_count += 1
+            _save_state(experiment_count, baseline_composite, current_baseline_path, tried_fixes)
+            continue
+        if len(high_confidence) < len(gradients):
+            dropped = len(gradients) - len(high_confidence)
+            print(
+                f"[Experiment {exp_num}] Filtered {dropped} low-confidence gradient(s) "
+                f"(threshold={GRADIENT_CONFIDENCE_THRESHOLD}); "
+                f"{len(high_confidence)} remaining."
+            )
+        gradients = high_confidence
 
         # ── Optimizer ────────────────────────────────────────────────────
         print(f"[Experiment {exp_num}] Applying up to {max_edits_per_iter} edit(s)...")
@@ -473,9 +515,12 @@ async def run_autonomous_loop(
         print(f"[Experiment {exp_num}] Re-evaluating after edits...")
         try:
             candidate_data = await _run_eval(candidate_path, use_real_llm=use_real_llm)
+            consecutive_eval_failures = 0  # reset on success
         except EvalError as exc:
+            consecutive_eval_failures += 1
             print(
-                f"[ERROR] Candidate eval failed: {exc} — reverting changes.",
+                f"[ERROR] Candidate eval failed ({consecutive_eval_failures}/"
+                f"{_MAX_CONSECUTIVE_EVAL_FAILURES}): {exc} — reverting changes.",
                 file=sys.stderr,
             )
             _git_revert(EDITABLE_FILES)
@@ -492,6 +537,16 @@ async def run_autonomous_loop(
             )
             experiment_count += 1
             _save_state(experiment_count, baseline_composite, current_baseline_path, tried_fixes)
+            if consecutive_eval_failures >= _MAX_CONSECUTIVE_EVAL_FAILURES:
+                print(
+                    f"[FATAL] {consecutive_eval_failures} consecutive eval failures — "
+                    "aborting loop. Check eval.py / Ollama before resuming.",
+                    file=sys.stderr,
+                )
+                break
+            backoff = min(_EVAL_BACKOFF_BASE * (2 ** (consecutive_eval_failures - 1)), 60.0)
+            print(f"[Loop] Backing off {backoff:.0f}s before next iteration...", file=sys.stderr)
+            await asyncio.sleep(backoff)
             continue
         candidate_composite = candidate_data.get("composite")
         candidate_safety = candidate_data.get("safety")

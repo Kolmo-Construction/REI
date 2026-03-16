@@ -425,10 +425,18 @@ async def analyze_failures(
         f"[Critic] Diagnosing {len(prompts)} failing scenario(s) "
         f"(parallel LLM calls)..."
     )
-    raw_results: list = await asyncio.gather(
+    # return_exceptions=True is a safety net for unexpected coroutine-level
+    # errors that bypass _call_critic's internal try/except (e.g. CancelledError).
+    _raw: list = await asyncio.gather(
         *[_call_critic(p) for p in prompts],
         return_exceptions=True,
     )
+    # Normalize: convert any BaseException to None so downstream code only
+    # ever sees dict | None.  This eliminates the isinstance(…, Exception)
+    # scatter-check and makes the handling path uniform.
+    raw_results: list[dict | None] = [
+        (None if isinstance(r, BaseException) else r) for r in _raw
+    ]
 
     # ── Process results ──────────────────────────────────────────────────
     gradients: list[TextualGradient] = []
@@ -436,12 +444,6 @@ async def analyze_failures(
     for meta, raw_result in zip(prompt_meta, raw_results):
         scenario_id, scores, query, _gt_section, failure_mode, reasoning = meta
 
-        if isinstance(raw_result, Exception):
-            print(
-                f"[Critic] {scenario_id}: LLM call raised {raw_result!r} — skipping.",
-                file=sys.stderr,
-            )
-            continue
         if raw_result is None:
             print(f"[Critic] {scenario_id}: LLM call failed — skipping.", file=sys.stderr)
             continue
