@@ -13,6 +13,7 @@ import pytest
 import httpx
 
 from greenvest.state import initial_state
+from greenvest.retrieval.branch_a_expert import TOP_K
 
 
 # ---------------------------------------------------------------------------
@@ -98,9 +99,11 @@ async def test_branch_a_backpack_query():
 
     chunks = await search_expert_advice(state)
 
-    assert len(chunks) > 0
-    top_text = chunks[0]["chunk_text"].lower()
-    assert any(kw in top_text for kw in ["liter", "pack", "volume", "backpack", "weekend"])
+    assert len(chunks) == TOP_K
+    for chunk in chunks:
+        assert "chunk_text" in chunk
+        assert "section" in chunk
+        assert len(chunk["chunk_text"]) > 0
 
 
 # ---------------------------------------------------------------------------

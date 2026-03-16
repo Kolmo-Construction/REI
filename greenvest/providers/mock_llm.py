@@ -84,25 +84,21 @@ def mock_query_translator(state: "GreenvestState") -> dict:
     activity = state.get("activity", "")
     environment = state.get("user_environment", "")
 
-    specs = []
+    specs: dict = {}
     confidence = 0.85
 
     if activity == "winter_camping" or environment in ("PNW_winter", "alpine"):
-        specs.append({"fill_type": "synthetic"})
-        specs.append({"r_value": ">=4.5"})
-        specs.append({"temp_rating_f": "<=15"})
+        specs = {"fill_type": "synthetic", "r_value": ">=4.5", "temp_rating_f": "<=15"}
         confidence = 0.92
     elif activity == "backpacking":
-        specs.append({"fill_type": "down"})
-        specs.append({"weight_oz": "<32"})
+        specs = {"fill_type": "down", "weight_oz": "<32"}
         confidence = 0.90
     elif activity == "car_camping":
-        specs.append({"fill_type": "synthetic"})
+        specs = {"fill_type": "synthetic"}
         confidence = 0.88
 
     if not specs:
-        # Minimal fallback
-        specs.append({"fill_type": "synthetic"})
+        specs = {"fill_type": "synthetic"}
         confidence = 0.75
 
     return {

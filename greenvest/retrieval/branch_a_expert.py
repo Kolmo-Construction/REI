@@ -9,25 +9,18 @@ Returns top 3 chunks as dicts with keys: title, section, chunk_text, url.
 from __future__ import annotations
 
 import asyncio
-from functools import lru_cache
 
 import structlog
-from fastembed import TextEmbedding
 from qdrant_client import AsyncQdrantClient
 
 from greenvest.config import settings
+from greenvest.retrieval.embeddings import dense_model as _dense_model
 from greenvest.state import GreenvestState
 
 log = structlog.get_logger(__name__)
 
 COLLECTION_NAME = "rei_expert_advice"
-DENSE_MODEL = "BAAI/bge-large-en-v1.5"
 TOP_K = 3
-
-
-@lru_cache(maxsize=1)
-def _dense_model() -> TextEmbedding:
-    return TextEmbedding(model_name=DENSE_MODEL)
 
 
 def _qdrant() -> AsyncQdrantClient:

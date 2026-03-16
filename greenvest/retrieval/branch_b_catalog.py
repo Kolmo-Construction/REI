@@ -7,22 +7,19 @@ Interface is identical to the Phase 6 flat-JSON version — no callers changed.
 from __future__ import annotations
 import asyncio
 import re
-from functools import lru_cache
 from typing import Optional
 
 import structlog
 from qdrant_client import AsyncQdrantClient, models
 from qdrant_client.models import SparseVector
-from fastembed import SparseTextEmbedding, TextEmbedding
 
 from greenvest.config import settings
+from greenvest.retrieval.embeddings import dense_model as _dense_model, sparse_model as _sparse_model
 from greenvest.state import GreenvestState
 
 log = structlog.get_logger(__name__)
 
 COLLECTION_NAME = "rei_products"
-DENSE_MODEL = "BAAI/bge-large-en-v1.5"
-DENSE_DIM = 1024
 
 # Common outdoor brand tokens — triggers sparse-heavy RRF weighting
 _BRAND_TOKENS = {
@@ -36,15 +33,6 @@ _BRAND_TOKENS = {
 }
 
 
-@lru_cache(maxsize=1)
-def _sparse_model() -> SparseTextEmbedding:
-    return SparseTextEmbedding(model_name="prithivida/Splade_PP_en_v1")
-
-
-@lru_cache(maxsize=1)
-def _dense_model() -> TextEmbedding:
-    return TextEmbedding(model_name=DENSE_MODEL)
-
 
 def _qdrant() -> AsyncQdrantClient:
     return AsyncQdrantClient(url=settings.QDRANT_URL)
@@ -55,14 +43,13 @@ def _detect_brand_token(query: str) -> bool:
     return any(brand in q for brand in _BRAND_TOKENS)
 
 
-def _build_filter(derived_specs: list[dict]) -> Optional[models.Filter]:
+def _build_filter(derived_specs: dict[str, str]) -> Optional[models.Filter]:
     """Convert derived_specs into a Qdrant Filter applied during ANN traversal (pre-filtering)."""
     conditions = []
     numeric_fields = {"temp_rating_f", "r_value", "weight_oz"}
     keyword_fields = {"fill_type", "water_resistance"}
 
-    for spec in derived_specs:
-        for key, value in spec.items():
+    for key, value in derived_specs.items():
             if key not in numeric_fields | keyword_fields:
                 continue
 
@@ -100,9 +87,8 @@ def _build_query_document(state: GreenvestState) -> str:
         parts.append(state["activity"].replace("_", " "))
     if state.get("user_environment"):
         parts.append(state["user_environment"].replace("_", " "))
-    for spec in state.get("derived_specs", []):
-        for k, v in spec.items():
-            parts.append(f"{k}: {v}")
+    for k, v in state.get("derived_specs", {}).items():
+        parts.append(f"{k}: {v}")
     return ". ".join(p for p in parts if p)
 
 
@@ -112,7 +98,7 @@ async def search_catalog(state: GreenvestState) -> list[dict]:
     Returns top 5 products as dicts (same shape as sample_products.json).
     """
     query_doc = _build_query_document(state)
-    spec_filter = _build_filter(state.get("derived_specs", []))
+    spec_filter = _build_filter(state.get("derived_specs", {}))
 
     # Dense and sparse embeddings generated concurrently (both run in executor — CPU-bound)
     loop = asyncio.get_event_loop()

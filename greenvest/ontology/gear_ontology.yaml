@@ -7,8 +7,11 @@ sleeping_bags:
   "sleeps cold / cold sleeper":
     temp_rating_f: "subtract 10 from stated rating"
     note: "recommend EN-tested ratings, not comfort ratings"
+  "alpine / mountaineering / alpine climbing / technical mountaineering":
+    fill_type: "down"
+    temp_rating_f: "<=15"
   "backpacking / backpack":
-    fill_type: "down OR synthetic"
+    fill_type: "down"
     weight_oz: "<32"
   "car camping / car camp":
     fill_type: "synthetic"

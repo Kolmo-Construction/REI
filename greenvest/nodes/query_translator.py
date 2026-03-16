@@ -15,7 +15,10 @@ def query_translator(state: GreenvestState) -> dict:
     """
     # Step 1: build candidate terms from extracted context
     terms = _extract_terms(state)
-    ontology_specs = lookup_all(terms)
+    # Ontology returns list of single-key dicts — flatten to {key: value}
+    ontology_specs: dict[str, str] = {
+        k: v for spec in lookup_all(terms) for k, v in spec.items()
+    }
 
     log.info(
         "query_translator",
@@ -29,7 +32,7 @@ def query_translator(state: GreenvestState) -> dict:
         confidence = 1.0
         specs = ontology_specs
     else:
-        # Step 2: LLM fallback
+        # Step 2: LLM fallback — returns flat dict via DerivedSpecs.model_dump(exclude_none=True)
         translator_fn = get_query_translator()
         result = translator_fn(state)
         specs = result["derived_specs"]
@@ -71,8 +74,9 @@ def _extract_terms(state: GreenvestState) -> list[str]:
     # Also pull key phrases from the raw query
     query = state.get("query", "").lower()
     for phrase in ["PNW", "winter camping", "backpacking", "car camping", "thru-hiking",
-                   "thru hiking", "alpine", "coastal", "wet climate", "waterproof",
-                   "side sleeper", "ultralight", "cold sleeper"]:
+                   "thru hiking", "alpine", "mountaineering", "alpine climbing",
+                   "coastal", "wet climate", "waterproof", "side sleeper",
+                   "ultralight", "cold sleeper"]:
         if phrase.lower() in query:
             terms.append(phrase)
     return terms

@@ -16,6 +16,10 @@ class Settings:
     OLLAMA_BASE_URL: str = field(default_factory=lambda: os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"))
     OLLAMA_ROUTER_MODEL: str = field(default_factory=lambda: os.getenv("OLLAMA_ROUTER_MODEL", "llama3.2:latest"))
     OLLAMA_SYNTHESIZER_MODEL: str = field(default_factory=lambda: os.getenv("OLLAMA_SYNTHESIZER_MODEL", "llama3:latest"))
+    OLLAMA_JUDGE_MODEL: str = field(default_factory=lambda: os.getenv("OLLAMA_JUDGE_MODEL", "gemma2:9b"))
+    LANGFUSE_PUBLIC_KEY: str = field(default_factory=lambda: os.getenv("LANGFUSE_PUBLIC_KEY", ""))
+    LANGFUSE_SECRET_KEY: str = field(default_factory=lambda: os.getenv("LANGFUSE_SECRET_KEY", ""))
+    LANGFUSE_HOST: str = field(default_factory=lambda: os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com"))
 
 
 settings = Settings()

@@ -21,9 +21,13 @@ def intent_router(state: GreenvestState) -> dict:
         user_environment=result.get("user_environment"),
     )
 
+    def _clean(val):
+        """Coerce LLM-emitted string 'null'/'none'/'unknown' to None."""
+        return None if (val is None or str(val).lower() in ("null", "none", "unknown")) else val
+
     return {
         "intent": result["intent"],
-        "activity": result.get("activity"),
-        "user_environment": result.get("user_environment"),
-        "experience_level": result.get("experience_level"),
+        "activity": _clean(result.get("activity")),
+        "user_environment": _clean(result.get("user_environment")),
+        "experience_level": _clean(result.get("experience_level")),
     }

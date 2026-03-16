@@ -11,6 +11,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from greenvest.logging_config import configure_logging
+configure_logging()
+
 from greenvest.graph import graph
 from greenvest.state import initial_state, GreenvestState
 

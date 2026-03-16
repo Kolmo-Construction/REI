@@ -12,10 +12,14 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 # Allow USE_MOCK_LLM to be set via environment before importing greenvest
-os.environ.setdefault("USE_MOCK_LLM", os.getenv("USE_MOCK_LLM", "true"))
+os.environ.setdefault("USE_MOCK_LLM", os.getenv("USE_MOCK_LLM", "false"))
+
+from greenvest.logging_config import configure_logging
+configure_logging()
 
 from greenvest.graph import graph
 from greenvest.state import initial_state
+from eval.langfuse_client import langfuse_client
 
 app = FastAPI(title="Greenvest Eval Server", version="1.0.0")
 
@@ -37,7 +41,7 @@ class InvokeResponse(BaseModel):
     user_environment: Optional[str]
     catalog_results: list
     clarification_message: Optional[str]
-    derived_specs: list
+    derived_specs: dict
     spec_confidence: float
 
 
@@ -61,7 +65,21 @@ async def invoke(req: InvokeRequest):
         if req.budget_usd is not None:
             state["budget_usd"] = tuple(req.budget_usd)
 
-        result = await graph.ainvoke(state)
+        lf = langfuse_client()
+        if lf:
+            with lf.start_as_current_observation(
+                name="greenvest_invoke",
+                as_type="span",
+                input=req.model_dump(),
+            ) as span:
+                result = await graph.ainvoke(state)
+                span.update(output={
+                    "action_flag": result.get("action_flag"),
+                    "intent": result.get("intent"),
+                    "recommendation": result.get("recommendation"),
+                })
+        else:
+            result = await graph.ainvoke(state)
 
         return InvokeResponse(
             recommendation=result.get("recommendation"),
@@ -71,7 +89,7 @@ async def invoke(req: InvokeRequest):
             user_environment=result.get("user_environment"),
             catalog_results=result.get("catalog_results", []),
             clarification_message=result.get("clarification_message"),
-            derived_specs=result.get("derived_specs", []),
+            derived_specs=result.get("derived_specs", {}),
             spec_confidence=result.get("spec_confidence", 0.0),
         )
     except Exception as exc:

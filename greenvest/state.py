@@ -23,7 +23,7 @@ class GreenvestState(TypedDict):
     budget_usd: Optional[tuple]      # (min, max) — None means unspecified
 
     # Derived technical specs (populated by Query Translator)
-    derived_specs: list              # e.g., [{"R_value": ">4.0"}, {"weight_oz": "<48"}]
+    derived_specs: dict              # e.g., {"fill_type": "synthetic", "temp_rating_f": "<=15"}
     spec_confidence: float           # 0.0–1.0; below 0.7 triggers re-clarification
 
     # Retrieval results
@@ -58,7 +58,7 @@ def initial_state(
         user_environment=None,
         experience_level=None,
         budget_usd=None,
-        derived_specs=[],
+        derived_specs={},
         spec_confidence=0.0,
         expert_context=[],
         catalog_results=[],
