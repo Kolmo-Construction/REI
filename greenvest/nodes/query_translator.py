@@ -73,10 +73,7 @@ def _extract_terms(state: GreenvestState) -> list[str]:
         terms.append(state["user_environment"])
     # Also pull key phrases from the raw query
     query = state.get("query", "").lower()
-    for phrase in ["PNW", "winter camping", "backpacking", "car camping", "thru-hiking",
-                   "thru hiking", "alpine", "mountaineering", "alpine climbing",
-                   "coastal", "wet climate", "waterproof", "side sleeper",
-                   "ultralight", "cold sleeper"]:
+    for phrase in ['Columbia jackets', 'PNW', 'winter camping', 'backpacking', 'car camping', 'thru-hiking', 'thru hiking', 'alpine', 'mountaineering', 'alpine climbing', 'coastal', 'wet climate', 'waterproof', 'side sleeper', 'ultralight', 'cold sleeper']:
         if phrase.lower() in query:
             terms.append(phrase)
     return terms
