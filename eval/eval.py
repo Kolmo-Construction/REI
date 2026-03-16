@@ -2,8 +2,8 @@
 Greenvest evaluation script.
 
 Loads scenario JSONs, runs graph.ainvoke for each scenario that reaches synthesis,
-scores the recommendation via Claude Opus 4.6 (LLM-as-a-Judge), logs traces to
-Langfuse, and writes a results JSON.
+scores the recommendation via the local Ollama judge, logs traces to Langfuse,
+and writes a results JSON.
 
 Usage:
     uv run python eval/eval.py \\
@@ -72,100 +72,110 @@ async def _run_scenario(sc: dict) -> dict:
     return await graph.ainvoke(state)
 
 
+async def _process_scenario(sc: dict, lf) -> tuple[dict, float, float, float, float, bool]:
+    """Run one scenario through graph + judge.
+
+    Returns
+    -------
+    (entry, persona, accuracy, safety, relevance, was_judged)
+    """
+    scenario_id = sc.get("scenario_id", "unknown")
+
+    if not _scenario_reaches_synthesis(sc):
+        print(f"  [{scenario_id}] skipped (does not reach synthesis)")
+        return {"scenario_id": scenario_id, "skipped": True}, 0.0, 0.0, 0.0, 0.0, False
+
+    print(f"  [{scenario_id}] running...")
+    query = sc["input"]["query"]
+    ground_truth = sc.get("judge_rubric")
+
+    try:
+        result = await _run_scenario(sc)
+    except Exception as exc:
+        print(f"  [{scenario_id}] FAILED: {exc}", file=sys.stderr)
+        return {"scenario_id": scenario_id, "error": str(exc)}, 0.0, 0.0, 0.0, 0.0, False
+
+    recommendation = result.get("recommendation") or ""
+    scores = await judge_recommendation(query, recommendation, ground_truth=ground_truth)
+
+    entry: dict = {"scenario_id": scenario_id}
+
+    # Log to Langfuse (trace created explicitly to avoid context-var bleed in concurrent coroutines)
+    if lf and scores:
+        try:
+            trace = lf.trace(
+                name=f"eval_{scenario_id}",
+                input={"query": query, "scenario_id": scenario_id},
+                output={"recommendation": recommendation},
+            )
+            for score_name, score_val in [
+                ("judge_composite", scores.composite),
+                ("judge_persona", scores.persona),
+                ("judge_accuracy", scores.accuracy),
+                ("judge_safety", scores.safety),
+                ("judge_relevance", scores.relevance),
+            ]:
+                try:
+                    lf.score(
+                        trace_id=trace.id,
+                        name=score_name,
+                        value=score_val,
+                        data_type="NUMERIC",
+                    )
+                except Exception as exc:
+                    print(f"  [WARN] Langfuse score failed ({score_name}): {exc}", file=sys.stderr)
+        except Exception as exc:
+            print(f"  [WARN] Langfuse trace failed: {exc}", file=sys.stderr)
+
+    if scores:
+        comp = scores.composite
+        entry.update({
+            "persona": scores.persona,
+            "accuracy": scores.accuracy,
+            "safety": scores.safety,
+            "relevance": scores.relevance,
+            "composite": comp,
+            "reasoning": scores.reasoning,
+        })
+        print(
+            f"  [{scenario_id}] composite={comp:.3f} "
+            f"persona={scores.persona:.2f} accuracy={scores.accuracy:.2f} "
+            f"safety={scores.safety:.2f} relevance={scores.relevance:.2f}"
+        )
+        return entry, scores.persona, scores.accuracy, scores.safety, scores.relevance, True
+    else:
+        entry.update({
+            "persona": None, "accuracy": None, "safety": None,
+            "relevance": None, "composite": None,
+        })
+        print(f"  [{scenario_id}] no judge scores (API key missing or call failed)")
+        return entry, 0.0, 0.0, 0.0, 0.0, False
+
+
 async def run_eval(dataset_dir: Path, output_path: Path) -> dict:
     scenarios = _load_scenarios(dataset_dir)
     print(f"Loaded {len(scenarios)} scenarios from {dataset_dir}")
 
     lf = langfuse_client()
-    per_scenario = []
+
+    # Run all scenarios concurrently
+    scenario_results = await asyncio.gather(
+        *[_process_scenario(sc, lf) for sc in scenarios],
+        return_exceptions=False,
+    )
+
+    per_scenario: list[dict] = []
     total_persona = total_accuracy = total_safety = total_relevance = 0.0
     judged_count = 0
 
-    for sc in scenarios:
-        scenario_id = sc.get("scenario_id", "unknown")
-
-        if not _scenario_reaches_synthesis(sc):
-            print(f"  [{scenario_id}] skipped (does not reach synthesis)")
-            per_scenario.append({"scenario_id": scenario_id, "skipped": True})
-            continue
-
-        print(f"  [{scenario_id}] running...")
-        query = sc["input"]["query"]
-        ground_truth = sc.get("judge_rubric")
-
-        try:
-            result = await _run_scenario(sc)
-        except Exception as exc:
-            print(f"  [{scenario_id}] FAILED: {exc}", file=sys.stderr)
-            per_scenario.append({"scenario_id": scenario_id, "error": str(exc)})
-            continue
-
-        recommendation = result.get("recommendation") or ""
-        scores = await judge_recommendation(query, recommendation, ground_truth=ground_truth)
-
-        entry: dict = {"scenario_id": scenario_id}
-        trace_id: str | None = None
-
-        # Log to Langfuse
-        if lf:
-            try:
-                with lf.start_as_current_observation(
-                    name=f"eval_{scenario_id}",
-                    as_type="span",
-                    input={"query": query, "scenario_id": scenario_id},
-                    output={"recommendation": recommendation, "action_flag": result.get("action_flag")},
-                ):
-                    trace_id = lf.get_current_trace_id()
-            except Exception as exc:
-                print(f"  [WARN] Langfuse trace failed: {exc}", file=sys.stderr)
-
-        if scores:
-            comp = scores.composite
-            entry.update({
-                "persona": scores.persona,
-                "accuracy": scores.accuracy,
-                "safety": scores.safety,
-                "relevance": scores.relevance,
-                "composite": comp,
-                "reasoning": scores.reasoning,
-            })
-            total_persona += scores.persona
-            total_accuracy += scores.accuracy
-            total_safety += scores.safety
-            total_relevance += scores.relevance
-            judged_count += 1
-            print(
-                f"  [{scenario_id}] composite={comp:.3f} "
-                f"persona={scores.persona:.2f} accuracy={scores.accuracy:.2f} "
-                f"safety={scores.safety:.2f} relevance={scores.relevance:.2f}"
-            )
-
-            # Write scores to Langfuse
-            if lf and trace_id:
-                for score_name, score_val in [
-                    ("judge_composite", comp),
-                    ("judge_persona", scores.persona),
-                    ("judge_accuracy", scores.accuracy),
-                    ("judge_safety", scores.safety),
-                    ("judge_relevance", scores.relevance),
-                ]:
-                    try:
-                        lf.create_score(
-                            trace_id=trace_id,
-                            name=score_name,
-                            value=score_val,
-                            data_type="NUMERIC",
-                        )
-                    except Exception as exc:
-                        print(f"  [WARN] Langfuse score failed ({score_name}): {exc}", file=sys.stderr)
-        else:
-            entry.update({
-                "persona": None, "accuracy": None, "safety": None,
-                "relevance": None, "composite": None,
-            })
-            print(f"  [{scenario_id}] no judge scores (API key missing or call failed)")
-
+    for entry, persona, accuracy, safety, relevance, was_judged in scenario_results:
         per_scenario.append(entry)
+        if was_judged:
+            total_persona += persona
+            total_accuracy += accuracy
+            total_safety += safety
+            total_relevance += relevance
+            judged_count += 1
 
     # Aggregate
     if judged_count > 0:

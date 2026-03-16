@@ -27,5 +27,8 @@ dev = [
     "pytest-asyncio>=0.23.0",
 ]
 
+[tool.setuptools.packages.find]
+include = ["greenvest*", "eval*"]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
