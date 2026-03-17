@@ -107,6 +107,15 @@ For patch_phrase_list:
   "new_phrases": ["<phrase1>", "<phrase2>", ...],
   "rationale": "<one sentence explaining the new phrases>"
 }
+
+For patch_set_literal:
+{
+  "edit_type": "patch_set_literal",
+  "node_name": "<variable name, e.g. '_ENV_SENSITIVE_ACTIVITIES'>",
+  "target_file": "<relative path, e.g. 'greenvest/nodes/clarification_gate.py'>",
+  "new_items": ["<item1>", "<item2>", ...],
+  "rationale": "<one sentence explaining the change>"
+}
 """.strip()
 
 _OPTIMIZER_USER_TEMPLATE = """\
@@ -303,6 +312,13 @@ def _build_context(gradient: TextualGradient) -> tuple[str, str]:
         current_repr = _read_current_phrase_list()
         return ("Phrase list in `_extract_terms()` of `query_translator.py`", current_repr)
 
+    elif fix_type == "patch_set_literal":
+        node_name = fix.get("node_name", "_ENV_SENSITIVE_ACTIVITIES")
+        target_file = REPO_ROOT / gradient.target_file
+        current = read_node_value(str(target_file), node_name)
+        current_repr = repr(current) if current is not None else "(variable not found)"
+        return (f"`{node_name}` (set) in `{gradient.target_file}`", current_repr)
+
     else:
         return (gradient.target_file, "(unknown fix type)")
 
@@ -324,9 +340,6 @@ def _apply_patch_prompt(plan: dict, gradient: TextualGradient) -> ApplyResult:
 
     target_path = REPO_ROOT / gradient.target_file
 
-    # Pre-validate that the variable actually exists in the target file before
-    # calling patch_prompt, so a hallucinated node_name is caught early and
-    # reported clearly rather than as a mid-edit EditError.
     try:
         existing = read_node_value(str(target_path), node_name)
     except Exception as exc:
@@ -413,6 +426,37 @@ def _apply_patch_phrase_list(plan: dict, gradient: TextualGradient) -> ApplyResu
         return ApplyResult(False, "", "patch_phrase_list", gradient.target_file, error=str(exc))
 
 
+def _apply_patch_set_literal(plan: dict, gradient: TextualGradient) -> ApplyResult:
+    """Apply a patch_set_literal edit plan."""
+    node_name = plan.get("node_name") or gradient.suggested_fix.get("node_name")
+    new_items = plan.get("new_items")
+    if not node_name:
+        return ApplyResult(False, "", "patch_set_literal", gradient.target_file,
+                           error="'node_name' missing from optimizer plan.")
+    if not new_items or not isinstance(new_items, list):
+        return ApplyResult(False, "", "patch_set_literal", gradient.target_file,
+                           error="'new_items' missing or not a list in optimizer plan.")
+
+    target_path = REPO_ROOT / gradient.target_file
+    try:
+        old_items = patch_list_literal(str(target_path), node_name, set(new_items))
+        added = [i for i in new_items if i not in old_items]
+        return ApplyResult(
+            success=True,
+            summary=(
+                f"Updated set `{node_name}` in `{gradient.target_file}`: "
+                f"added {added}. "
+                f"Rationale: {plan.get('rationale', '')}"
+            ),
+            edit_type="patch_set_literal",
+            filepath=gradient.target_file,
+            old_value=old_items,
+            new_value=new_items,
+        )
+    except EditError as exc:
+        return ApplyResult(False, "", "patch_set_literal", gradient.target_file, error=str(exc))
+
+
 def _apply_plan(plan: dict, gradient: TextualGradient) -> ApplyResult:
     """Dispatch to the correct apply function based on edit_type."""
     edit_type = plan.get("edit_type", gradient.suggested_fix_type)
@@ -422,6 +466,8 @@ def _apply_plan(plan: dict, gradient: TextualGradient) -> ApplyResult:
         return _apply_update_ontology(plan, gradient)
     elif edit_type == "patch_phrase_list":
         return _apply_patch_phrase_list(plan, gradient)
+    elif edit_type == "patch_set_literal":
+        return _apply_patch_set_literal(plan, gradient)
     else:
         return ApplyResult(
             False, "", edit_type, gradient.target_file,
@@ -433,14 +479,13 @@ def _apply_plan(plan: dict, gradient: TextualGradient) -> ApplyResult:
 # Public API
 # ---------------------------------------------------------------------------
 
-async def generate_and_apply(gradient: TextualGradient) -> ApplyResult:
+async def generate_edit_plan(gradient: TextualGradient) -> dict | None:
     """
-    Generate a specific code edit for a TextualGradient and apply it.
+    Call the optimizer LLM and return the raw edit plan dict — no file writes.
 
-    1. Reads the current value of the targeted code element.
-    2. Calls the optimizer LLM with the gradient + current value.
-    3. Parses the structured edit plan.
-    4. Applies the edit via deterministic edit_tools.
+    Use this when you want to inspect or diff the planned change before applying
+    it (e.g. in grid-search mode). The returned dict can be passed directly to
+    apply_plan().
 
     Parameters
     ----------
@@ -448,7 +493,7 @@ async def generate_and_apply(gradient: TextualGradient) -> ApplyResult:
 
     Returns
     -------
-    ApplyResult — check `.success` and `.error` fields.
+    Raw plan dict from the optimizer LLM, or None if the LLM call failed.
     """
     target_description, current_value_repr = _build_context(gradient)
     fix = gradient.suggested_fix
@@ -466,17 +511,46 @@ async def generate_and_apply(gradient: TextualGradient) -> ApplyResult:
     )
 
     print(
-        f"[Optimizer] Generating edit for {gradient.target_node} "
+        f"[Optimizer] Generating edit plan for {gradient.target_node} "
         f"({gradient.suggested_fix_type})..."
     )
     plan = await _call_optimizer(user_prompt)
+    if plan is None:
+        print(
+            f"[Optimizer] LLM returned no parseable plan for "
+            f"{gradient.scenario_id}.",
+            file=sys.stderr,
+        )
+    return plan
+
+
+# Expose the internal apply dispatcher as a public function so grid_search
+# can apply a plan generated by generate_edit_plan() without re-running the LLM.
+apply_plan = _apply_plan
+
+
+async def generate_and_apply(gradient: TextualGradient) -> ApplyResult:
+    """
+    Generate a specific code edit for a TextualGradient and apply it.
+
+    Convenience wrapper around generate_edit_plan() + apply_plan().
+
+    Parameters
+    ----------
+    gradient : TextualGradient from the Critic
+
+    Returns
+    -------
+    ApplyResult — check `.success` and `.error` fields.
+    """
+    plan = await generate_edit_plan(gradient)
     if plan is None:
         return ApplyResult(
             False, "", gradient.suggested_fix_type, gradient.target_file,
             error="Optimizer LLM returned no parseable plan."
         )
 
-    result = _apply_plan(plan, gradient)
+    result = apply_plan(plan, gradient)
     if result.success:
         print(f"[Optimizer] Applied: {result.summary}")
     else:

@@ -357,99 +357,142 @@ uv run python eval/compare.py baseline.json candidate.json || echo "Quality decl
 
 ---
 
-## 8. Autonomous Optimization Loop (optimize.py)
+## 8. Autonomous Optimization Loop (autonomous_optimize.py)
 
-This is the autoresearch-style overnight loop. The script establishes a baseline, then waits for you (or a meta-agent) to make changes and press Enter to evaluate.
+The autonomous loop runs without human input: Critic diagnoses failing scenarios,
+Optimizer applies code edits, Gate accepts or reverts, repeat.
+See `docs/autonomous_optimizer.md` for the full reference.
 
-**Start a session:**
+**Prerequisites:**
+- Ollama running with `gemma2:9b` pulled (used as eval judge)
+- `ANTHROPIC_API_KEY` set (used for Critic and Optimizer LLM calls)
+- A baseline eval result JSON (run `eval/eval.py` first if you don't have one)
+
 ```bash
-ANTHROPIC_API_KEY=your-key uv run python eval/optimize.py
+ollama pull gemma2:9b
 ```
 
-**If you already have a baseline:**
+**Dry-run — diagnose failures without applying any edits:**
 ```bash
-ANTHROPIC_API_KEY=your-key uv run python eval/optimize.py \
-  --baseline eval_results/baseline.json
+uv run python -m eval.autonomous_optimize \
+  --baseline eval_results/candidate_20260316T210432Z.json \
+  --dry-run --target-composite 0.95
 ```
 
-**What happens:**
-```
-Loaded baseline from eval_results/baseline.json: composite=0.847
-
-Ready. Edit agent files, then press Enter to evaluate.
-Editable files: greenvest/nodes/synthesizer.py, greenvest/nodes/clarification_gate.py, ...
-Max experiments: 20
-Improvement threshold: 0.01
-Safety floor: 0.70
-
-[Experiment 1/20] Press Enter to evaluate (Ctrl+C to quit)...
-Describe your change: Improved persona tone — more specific about gear tradeoffs
-Which file(s) did you edit? greenvest/nodes/synthesizer.py
-
-Running evaluation...
-  [pnw-winter-bag-001] composite=0.903 ...
-
-Baseline composite:  0.847
-Candidate composite: 0.903
-KEEP: composite improved by 0.0560
-Logged to experiments/log.md
-
-[Experiment 2/20] Press Enter to evaluate...
+**Standard run — commits go to a new `auto/optimize-{ts}` branch, never main:**
+```bash
+uv run python -m eval.autonomous_optimize \
+  --baseline eval_results/candidate_20260316T210432Z.json \
+  --max-experiments 10 --target-composite 0.95
 ```
 
-**Files the loop can revert (editable scope):**
-```
-greenvest/nodes/synthesizer.py      ← _REI_PERSONA, refusal/support text
-greenvest/nodes/clarification_gate.py ← clarification question phrasing
-greenvest/nodes/intent_router.py    ← intent classification prompt
-greenvest/nodes/query_translator.py ← spec translation prompt
-greenvest/ontology/gear_ontology.yaml ← ontology term mappings
+**Run without committing (inspect with `git diff` afterwards):**
+```bash
+uv run python -m eval.autonomous_optimize \
+  --baseline eval_results/candidate_20260316T210432Z.json \
+  --no-commit --target-composite 0.95
 ```
 
-**Files the loop will never touch:**
-```
-greenvest/graph.py      tests/        eval/
-greenvest/state.py      data/         .github/
-greenvest/retrieval/
+**Resume a crashed or interrupted session exactly where it left off:**
+```bash
+uv run python -m eval.autonomous_optimize --resume --target-composite 0.95
 ```
 
-**Running with a meta-agent overnight:**
+**Grid search — evaluate N candidates in isolated worktrees, zero commits:**
+```bash
+uv run python -m eval.grid_search \
+  --baseline eval_results/candidate_20260316T210432Z.json \
+  --max-candidates 5 --failure-threshold 0.92
 ```
-# In Claude Code, with the REI directory open:
-"Read program.md and run the optimization loop. Establish a baseline first,
-then run 20 experiments targeting the synthesizer persona. Document each change."
+
+**What happens during a run:**
+```
+[Init] Loaded baseline: composite=0.9125
+[Experiment 1/10] Diagnosing failures...
+[Critic] Diagnosing 1 failing scenario(s) (parallel LLM calls)...
+[Critic] avalanche-safety-001: low_accuracy -> synthesizer (confidence=0.72)
+[Experiment 1] Applying 1 edit...
+[Optimizer] Generating edit plan for synthesizer (patch_prompt)...
+[Optimizer] Applied: Patched `_REI_PERSONA` in synthesizer.py
+[Experiment 1] Re-evaluating after edits...
+[Experiment 1] Baseline=0.9125  Candidate=0.9310  Safety=1.0
+[Gate] KEEP - delta_composite=+0.0185 >= threshold=0.01
+[Git] Committed kept changes for experiment 1.
+[Log] Appended to experiments/log.md
+[State] Saved -> experiments/loop_state.json
+```
+
+**Files the loop can edit (allowlisted):**
+```
+greenvest/nodes/synthesizer.py       ← _REI_PERSONA, _OUT_OF_BOUNDS_RESPONSE, _SUPPORT_RESPONSE
+greenvest/nodes/query_translator.py  ← phrase list in _extract_terms()
+greenvest/nodes/intent_router.py     ← routing prompt constants
+greenvest/nodes/clarification_gate.py ← _ENV_SENSITIVE_ACTIVITIES set, question templates
+greenvest/ontology/gear_ontology.yaml ← alias keys and spec values
+```
+
+**After a session — merge to main when satisfied:**
+```bash
+git log --oneline main..auto/optimize-TIMESTAMP
+git checkout main && git merge --no-ff auto/optimize-TIMESTAMP
 ```
 
 **View experiment history:**
 ```bash
 cat experiments/log.md
+
+# Score trend across all eval runs
+uv run python eval/dashboard.py
+```
+
+**Key flags:**
+```
+--baseline PATH       Load existing baseline JSON (skip baseline eval)
+--max-experiments N   Max iterations (default 10)
+--target-composite S  Stop early when composite >= S (default 0.90)
+--token-budget N      Abort after N total LLM tokens
+--dry-run             Critic only, no edits applied
+--resume              Restore state from experiments/loop_state.json
+--reset-tried-fixes   Clear the persistent blacklist (allows retrying blocked fixes)
+--no-commit           Keep accepted changes in working tree without committing
+--mock-llm            Use mock LLM (offline testing of loop infrastructure only)
 ```
 
 ---
 
 ## 9. Production Monitoring (prod_judge.py)
 
-Samples 5% of live traces from LangSmith and scores them with the judge.
+Samples 5% of live traces from Langfuse and scores them with the judge.
+A GitHub Actions workflow (`.github/workflows/prod_judge.yml`) runs this automatically every 15 minutes — you only need to run it manually for ad-hoc checks.
 
 **Prerequisites:**
-- `LANGCHAIN_API_KEY` — LangSmith API key
+- `LANGFUSE_PUBLIC_KEY` — Langfuse public key
+- `LANGFUSE_SECRET_KEY` — Langfuse secret key
 - `ANTHROPIC_API_KEY` — for judge scoring
-- Production traces flowing into a LangSmith project named `greenvest-prod`
+- Production traces flowing into Langfuse
 
 **Run manually:**
 ```bash
-LANGCHAIN_API_KEY=your-key \
+LANGFUSE_PUBLIC_KEY=your-public-key \
+LANGFUSE_SECRET_KEY=your-secret-key \
 ANTHROPIC_API_KEY=your-key \
 uv run python eval/prod_judge.py \
-  --project greenvest-prod \
-  --sample-rate 0.05
+  --sample-rate 0.05 \
+  --lookback-minutes 60
 ```
 
-**Run as a cron job (every 15 minutes):**
+**Run as a cron job (every 15 minutes) — already live via GitHub Actions:**
 ```
 */15 * * * * cd /path/to/REI && \
-  LANGCHAIN_API_KEY=xxx ANTHROPIC_API_KEY=xxx \
-  uv run python eval/prod_judge.py --project greenvest-prod >> logs/prod_judge.log 2>&1
+  LANGFUSE_PUBLIC_KEY=xxx LANGFUSE_SECRET_KEY=xxx ANTHROPIC_API_KEY=xxx \
+  uv run python eval/prod_judge.py --sample-rate 0.05 --lookback-minutes 15 >> logs/prod_judge.log 2>&1
+```
+
+**GitHub Actions secrets required** (repo → Settings → Secrets → Actions):
+```
+LANGFUSE_PUBLIC_KEY
+LANGFUSE_SECRET_KEY
+ANTHROPIC_API_KEY
 ```
 
 **Exit codes:**
@@ -583,7 +626,7 @@ uv run pytest tests/test_vertical_slice.py::test_my_new_scenario -v
 | Run PromptFoo | `ANTHROPIC_API_KEY=xxx promptfoo eval --config promptfoo.yaml` |
 | Score with judge | `ANTHROPIC_API_KEY=xxx uv run python eval/eval.py --output eval_results/run.json` |
 | Compare two runs | `uv run python eval/compare.py eval_results/baseline.json eval_results/candidate.json` |
-| Run optimization loop | `ANTHROPIC_API_KEY=xxx uv run python eval/optimize.py` |
+| Run optimization loop | `ANTHROPIC_API_KEY=xxx uv run python -m eval.autonomous_optimize --baseline eval_results/candidate_20260316T210432Z.json` |
 | View score dashboard | `uv run python eval/dashboard.py` |
 | Run production monitor | `LANGCHAIN_API_KEY=xxx ANTHROPIC_API_KEY=xxx uv run python eval/prod_judge.py` |
 
@@ -592,8 +635,8 @@ uv run pytest tests/test_vertical_slice.py::test_my_new_scenario -v
 | Variable | Required for | Default |
 |---|---|---|
 | `USE_MOCK_LLM` | All tests and eval.py | `true` |
-| `ANTHROPIC_API_KEY` | Judge scoring (eval.py, optimize.py, PromptFoo, prod_judge.py) | none |
-| `LANGCHAIN_API_KEY` | LangSmith tracing + prod_judge.py | none |
-| `LANGCHAIN_TRACING_V2` | LangSmith tracing | `false` |
-| `LANGCHAIN_PROJECT` | LangSmith project name | none |
+| `ANTHROPIC_API_KEY` | Judge scoring (eval.py, autonomous_optimize.py, PromptFoo, prod_judge.py) | none |
+| `LANGFUSE_PUBLIC_KEY` | Production monitoring (prod_judge.py, GitHub Actions) | none |
+| `LANGFUSE_SECRET_KEY` | Production monitoring (prod_judge.py, GitHub Actions) | none |
+| `OLLAMA_JUDGE_MODEL` | Local judge in autonomous optimizer | `gemma2:9b` |
 | `QDRANT_URL` | Live retrieval (not needed with USE_MOCK_LLM=true) | `http://localhost:6333` |

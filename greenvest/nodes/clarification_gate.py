@@ -32,6 +32,11 @@ def clarification_gate(state: GreenvestState) -> dict:
         log.info("clarification_gate", decision="out_of_bounds", session_id=state["session_id"])
         return {"action_flag": "READY_TO_SYNTHESIZE"}
 
+    # Greeting — bypass retrieval, respond with friendly pivot
+    if intent == "Greeting":
+        log.info("clarification_gate", decision="greeting_bypass", session_id=state["session_id"])
+        return {"action_flag": "READY_TO_SYNTHESIZE"}
+
     # Support — bypass retrieval, route straight to synthesizer
     if intent == "Support":
         log.info("clarification_gate", decision="support_bypass", session_id=state["session_id"])

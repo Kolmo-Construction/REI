@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Greenvest Gear Advisor</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #f0f4f0;
+    color: #1a1a1a;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    background: #2d6a2d;
+    color: #fff;
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+  header h1 { font-size: 1.1rem; font-weight: 600; }
+  header small { font-size: 0.75rem; opacity: 0.75; }
+
+  #store-row {
+    background: #fff;
+    border-bottom: 1px solid #dde;
+    padding: 8px 16px;
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+    font-size: 0.8rem;
+  }
+  #store-row label { color: #555; }
+  #store-row input, #store-row select {
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 3px 7px;
+    font-size: 0.8rem;
+  }
+
+  #chat-window {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .bubble-wrap {
+    display: flex;
+    flex-direction: column;
+    max-width: 72%;
+  }
+  .bubble-wrap.user { align-self: flex-end; align-items: flex-end; }
+  .bubble-wrap.agent { align-self: flex-start; align-items: flex-start; }
+
+  .bubble {
+    padding: 10px 14px;
+    border-radius: 16px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .bubble-wrap.user .bubble {
+    background: #2d6a2d;
+    color: #fff;
+    border-bottom-right-radius: 4px;
+  }
+  .bubble-wrap.agent .bubble {
+    background: #fff;
+    border: 1px solid #dde;
+    border-bottom-left-radius: 4px;
+  }
+  .bubble-wrap.agent.clarify .bubble {
+    border-color: #f0a500;
+    background: #fffbf0;
+  }
+  .bubble-wrap.agent.error .bubble {
+    border-color: #e05;
+    background: #fff5f5;
+  }
+
+  .meta {
+    font-size: 0.7rem;
+    color: #888;
+    margin-top: 4px;
+    padding: 0 4px;
+  }
+  .meta span { margin-right: 8px; }
+
+  .catalog-toggle {
+    font-size: 0.72rem;
+    color: #2d6a2d;
+    cursor: pointer;
+    text-decoration: underline;
+    margin-top: 4px;
+    padding: 0 4px;
+  }
+  .catalog-list {
+    display: none;
+    background: #fff;
+    border: 1px solid #dde;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 0.75rem;
+    line-height: 1.6;
+    max-height: 180px;
+    overflow-y: auto;
+    margin-top: 4px;
+  }
+  .catalog-list.open { display: block; }
+
+  .vote-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 5px;
+    padding: 0 2px;
+  }
+  .vote-btn {
+    background: none;
+    border: 1px solid #dde;
+    border-radius: 6px;
+    padding: 2px 8px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    color: #888;
+    line-height: 1.4;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .vote-btn:hover { border-color: #aaa; color: #333; }
+  .vote-btn.up.selected   { background: #e8f5e8; border-color: #2d6a2d; color: #2d6a2d; }
+  .vote-btn.down.selected { background: #fdecea; border-color: #c0392b; color: #c0392b; }
+  .vote-btn:disabled { opacity: 0.5; cursor: default; }
+
+  #input-row {
+    background: #fff;
+    border-top: 1px solid #dde;
+    padding: 10px 12px;
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  #input-row textarea {
+    flex: 1;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    padding: 8px 12px;
+    font-size: 0.9rem;
+    resize: none;
+    height: 40px;
+    max-height: 120px;
+    line-height: 1.4;
+    overflow-y: auto;
+    font-family: inherit;
+  }
+  #input-row textarea:focus { outline: none; border-color: #2d6a2d; }
+
+  #send-btn {
+    background: #2d6a2d;
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 0 18px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  #send-btn:disabled { opacity: 0.5; cursor: default; }
+
+  #new-btn {
+    background: none;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    padding: 0 12px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    color: #555;
+  }
+  #new-btn:hover { border-color: #888; }
+
+  .typing {
+    display: flex;
+    gap: 5px;
+    padding: 10px 14px;
+    background: #fff;
+    border: 1px solid #dde;
+    border-radius: 16px;
+    border-bottom-left-radius: 4px;
+    width: fit-content;
+  }
+  .typing span {
+    width: 7px; height: 7px;
+    background: #aaa;
+    border-radius: 50%;
+    animation: bounce 1.2s infinite;
+  }
+  .typing span:nth-child(2) { animation-delay: 0.2s; }
+  .typing span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce {
+    0%, 80%, 100% { transform: translateY(0); }
+    40% { transform: translateY(-6px); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Greenvest Gear Advisor</h1>
+    <small id="session-label">Session initialising…</small>
+  </div>
+</header>
+
+<div id="store-row">
+  <label>Store <input id="store-id" value="REI-Seattle" style="width:120px"></label>
+  <label>Member # <input id="member-number" placeholder="optional" style="width:110px"></label>
+  <label>Budget ($) <input id="budget-min" placeholder="min" style="width:60px"> – <input id="budget-max" placeholder="max" style="width:60px"></label>
+</div>
+
+<div id="chat-window"></div>
+
+<div id="input-row">
+  <button id="new-btn" title="Start a new conversation">New</button>
+  <textarea id="query-input" placeholder="Ask about gear…" rows="1"></textarea>
+  <button id="send-btn">Send</button>
+</div>
+
+<script>
+"use strict";
+
+// ── Session state ──────────────────────────────────────────────────────────
+let sessionId = crypto.randomUUID();
+let clarificationCount = 0;
+let preSeedState = {};       // activity, user_environment, derived_specs carried forward
+let lastQuery = "";          // query that produced the current agent response
+
+function resetSession() {
+  sessionId = crypto.randomUUID();
+  clarificationCount = 0;
+  preSeedState = {};
+  document.getElementById("chat-window").innerHTML = "";
+  document.getElementById("session-label").textContent = `Session ${sessionId.slice(0, 8)}`;
+  appendAgentBubble("Hi! Tell me what activity you're shopping for and I'll find gear that fits.", "agent");
+}
+
+// ── DOM helpers ────────────────────────────────────────────────────────────
+const chatWindow = document.getElementById("chat-window");
+
+function scrollBottom() {
+  chatWindow.scrollTop = chatWindow.scrollHeight;
+}
+
+function appendUserBubble(text) {
+  const wrap = document.createElement("div");
+  wrap.className = "bubble-wrap user";
+  wrap.innerHTML = `<div class="bubble">${escHtml(text)}</div>`;
+  chatWindow.appendChild(wrap);
+  scrollBottom();
+}
+
+function appendAgentBubble(text, type = "agent", meta = null, catalogItems = null, feedbackData = null) {
+  const wrap = document.createElement("div");
+  wrap.className = `bubble-wrap agent ${type === "clarify" ? "clarify" : type === "error" ? "error" : ""}`;
+
+  const bubble = document.createElement("div");
+  bubble.className = "bubble";
+  bubble.textContent = text;
+  wrap.appendChild(bubble);
+
+  if (meta) {
+    const m = document.createElement("div");
+    m.className = "meta";
+    if (meta.intent)      m.innerHTML += `<span>intent: <b>${escHtml(meta.intent)}</b></span>`;
+    if (meta.activity)    m.innerHTML += `<span>activity: <b>${escHtml(meta.activity)}</b></span>`;
+    if (meta.confidence != null) m.innerHTML += `<span>confidence: <b>${(meta.confidence * 100).toFixed(0)}%</b></span>`;
+    if (meta.nResults != null)   m.innerHTML += `<span>${meta.nResults} catalog result${meta.nResults !== 1 ? "s" : ""}</span>`;
+    wrap.appendChild(m);
+  }
+
+  if (catalogItems && catalogItems.length > 0) {
+    const toggle = document.createElement("div");
+    toggle.className = "catalog-toggle";
+    toggle.textContent = `Show ${catalogItems.length} catalog result${catalogItems.length !== 1 ? "s" : ""}`;
+    const list = document.createElement("div");
+    list.className = "catalog-list";
+    list.innerHTML = catalogItems.map(r => {
+      const name = r.name || r.product_name || r.id || JSON.stringify(r);
+      const price = r.price != null ? ` — $${r.price}` : "";
+      return `• ${escHtml(String(name))}${escHtml(price)}`;
+    }).join("<br>");
+    toggle.addEventListener("click", () => list.classList.toggle("open"));
+    wrap.appendChild(toggle);
+    wrap.appendChild(list);
+  }
+
+  if (feedbackData) {
+    const voteRow = document.createElement("div");
+    voteRow.className = "vote-row";
+
+    const upBtn   = document.createElement("button");
+    upBtn.className = "vote-btn up";
+    upBtn.textContent = "👍";
+    upBtn.title = "Good response";
+
+    const downBtn = document.createElement("button");
+    downBtn.className = "vote-btn down";
+    downBtn.textContent = "👎";
+    downBtn.title = "Bad response";
+
+    async function castVote(vote, clickedBtn, otherBtn) {
+      upBtn.disabled = true;
+      downBtn.disabled = true;
+      try {
+        await fetch("/feedback", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...feedbackData, vote }),
+        });
+        clickedBtn.classList.add("selected");
+        otherBtn.classList.remove("selected");
+      } catch (_) {
+        // silent — feedback is best-effort
+      } finally {
+        upBtn.disabled = false;
+        downBtn.disabled = false;
+      }
+    }
+
+    upBtn.addEventListener("click",   () => castVote("up",   upBtn,   downBtn));
+    downBtn.addEventListener("click", () => castVote("down", downBtn, upBtn));
+
+    voteRow.appendChild(upBtn);
+    voteRow.appendChild(downBtn);
+    wrap.appendChild(voteRow);
+  }
+
+  chatWindow.appendChild(wrap);
+  scrollBottom();
+  return wrap;
+}
+
+function showTyping() {
+  const wrap = document.createElement("div");
+  wrap.className = "bubble-wrap agent";
+  wrap.id = "typing-indicator";
+  wrap.innerHTML = `<div class="typing"><span></span><span></span><span></span></div>`;
+  chatWindow.appendChild(wrap);
+  scrollBottom();
+  return wrap;
+}
+
+function removeTyping() {
+  const el = document.getElementById("typing-indicator");
+  if (el) el.remove();
+}
+
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+// ── Send ───────────────────────────────────────────────────────────────────
+async function sendMessage() {
+  const input = document.getElementById("query-input");
+  const query = input.value.trim();
+  if (!query) return;
+
+  lastQuery = query;
+  input.value = "";
+  input.style.height = "40px";
+  setInputEnabled(false);
+
+  appendUserBubble(query);
+  const typing = showTyping();
+
+  // Build budget list if provided
+  const bMin = parseFloat(document.getElementById("budget-min").value);
+  const bMax = parseFloat(document.getElementById("budget-max").value);
+  const budgetUsd = (!isNaN(bMin) && !isNaN(bMax)) ? [bMin, bMax]
+                  : (!isNaN(bMin)) ? [bMin, bMin * 3]
+                  : null;
+
+  const memberNum = document.getElementById("member-number").value.trim() || null;
+  const storeId   = document.getElementById("store-id").value.trim() || "REI-Seattle";
+
+  const body = {
+    query,
+    session_id: sessionId,
+    store_id: storeId,
+    member_number: memberNum,
+    clarification_count: clarificationCount,
+    budget_usd: budgetUsd,
+    pre_seed_state: preSeedState,
+  };
+
+  try {
+    const resp = await fetch("/invoke", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    removeTyping();
+
+    if (!resp.ok) {
+      const errText = await resp.text().catch(() => resp.statusText);
+      appendAgentBubble(`Error ${resp.status}: ${errText}`, "error");
+      setInputEnabled(true);
+      return;
+    }
+
+    const data = await resp.json();
+    handleResponse(data);
+
+  } catch (err) {
+    removeTyping();
+    appendAgentBubble(`Network error: ${err.message}`, "error");
+    setInputEnabled(true);
+  }
+}
+
+function handleResponse(data) {
+  const flag = data.action_flag || "";
+
+  // Carry forward useful state for the next turn
+  if (data.activity)         preSeedState.activity         = data.activity;
+  if (data.user_environment) preSeedState.user_environment = data.user_environment;
+  if (data.derived_specs && Object.keys(data.derived_specs).length)
+                             preSeedState.derived_specs    = data.derived_specs;
+  if (data.messages && data.messages.length)
+                             preSeedState.messages         = data.messages;
+
+  const fd = {
+    session_id:  sessionId,
+    store_id:    document.getElementById("store-id").value.trim() || "REI-Seattle",
+    query:       lastQuery,
+    action_flag: data.action_flag || "",
+    intent:      data.intent || null,
+    activity:    data.activity || null,
+  };
+
+  if (flag === "REQUIRES_CLARIFICATION") {
+    clarificationCount += 1;
+    const msg = data.clarification_message || "Could you tell me a bit more?";
+    appendAgentBubble(msg, "clarify", null, null, { ...fd, response: msg });
+    setInputEnabled(true);
+    return;
+  }
+
+  // Normal recommendation
+  const text = data.recommendation || "(no recommendation returned)";
+  const meta = {
+    intent:     data.intent,
+    activity:   data.activity,
+    confidence: data.spec_confidence,
+    nResults:   data.catalog_results ? data.catalog_results.length : 0,
+  };
+  appendAgentBubble(text, "agent", meta, data.catalog_results, { ...fd, response: text });
+
+  // Reset clarification counter after a full recommendation, but keep context
+  clarificationCount = 0;
+
+  setInputEnabled(true);
+}
+
+function setInputEnabled(enabled) {
+  document.getElementById("send-btn").disabled = !enabled;
+  document.getElementById("query-input").disabled = !enabled;
+  if (enabled) document.getElementById("query-input").focus();
+}
+
+// ── Event wiring ───────────────────────────────────────────────────────────
+document.getElementById("send-btn").addEventListener("click", sendMessage);
+document.getElementById("new-btn").addEventListener("click", resetSession);
+
+document.getElementById("query-input").addEventListener("keydown", e => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+
+// Auto-grow textarea
+document.getElementById("query-input").addEventListener("input", function () {
+  this.style.height = "40px";
+  this.style.height = Math.min(this.scrollHeight, 120) + "px";
+});
+
+// ── Init ───────────────────────────────────────────────────────────────────
+resetSession();
+</script>
+</body>
+</html>

@@ -15,7 +15,8 @@ class GreenvestState(TypedDict):
         "Product_Search",
         "Education",
         "Support",
-        "Out_of_Bounds"
+        "Out_of_Bounds",
+        "Greeting"
     ]]
     activity: Optional[str]          # e.g., "alpine_climbing", "car_camping", "thru_hiking"
     user_environment: Optional[str]  # e.g., "PNW_winter", "desert_summer", "alpine"

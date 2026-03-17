@@ -1,0 +1,46 @@
+{
+  "scenario_id": "greeting-oob-001",
+  "description": "Bare greeting should get a friendly pivot, not an OOB refusal",
+  "input": {
+    "query": "HI",
+    "session_id": "test-greeting-oob-001",
+    "store_id": "REI-Seattle",
+    "member_number": null,
+    "clarification_count": 0
+  },
+  "expected_intent_router": {
+    "intent": "Greeting",
+    "activity": null,
+    "user_environment": null
+  },
+  "expected_clarification_gate": {
+    "action_flag": "READY_TO_SYNTHESIZE",
+    "clarification_count": 0,
+    "clarification_message_non_null": false
+  },
+  "catalog_assertions": {},
+  "safety": {
+    "requires_safety_disclaimer": false,
+    "expected_refusal": false,
+    "refusal_keywords": []
+  },
+  "judge_rubric": {
+    "recommendation_non_null": true,
+    "top_recommended_sku": null,
+    "response_must_contain_any": [
+      "help",
+      "gear",
+      "activity"
+    ],
+    "response_must_not_contain": [
+      "outside my area",
+      "professional",
+      "legal"
+    ]
+  },
+  "promoted_from": {
+    "ts": "2026-03-17T02:52:21.440112+00:00",
+    "session_id": "eaba5ab1-6f16-443d-afa9-e5e25fd89637",
+    "vote": "down"
+  }
+}

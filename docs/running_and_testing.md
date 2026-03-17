@@ -641,3 +641,26 @@ uv sync --dev && uv run pytest tests/test_vertical_slice.py -v
 ```
 
 Do not run with `USE_MOCK_LLM=false` in CI — Ollama is not available in typical CI environments and the test assertions assume deterministic mock behavior.
+
+---
+
+## Autonomous Optimization Loop
+
+For running and operating the autonomous LLM-driven optimization pipeline, see:
+
+**`docs/autonomous_optimizer.md`** — Full reference covering architecture, CLI flags, configuration, observability gaps, and active blockers.
+
+**Quick start:**
+```bash
+# Dry run — diagnose failures without applying edits
+ANTHROPIC_API_KEY=xxx uv run python -m eval.autonomous_optimize \
+  --baseline eval_results/candidate_20260316T210432Z.json \
+  --dry-run
+
+# Standard run — commits to auto/optimize-{ts} branch
+ANTHROPIC_API_KEY=xxx uv run python -m eval.autonomous_optimize \
+  --baseline eval_results/candidate_20260316T210432Z.json \
+  --max-experiments 10 --target-composite 0.95
+```
+
+See **`TESTING.md` Section 8** for the full command reference including grid search, resume, and post-session merge.

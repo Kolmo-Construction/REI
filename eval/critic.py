@@ -30,7 +30,7 @@ from greenvest.config import settings
 # ---------------------------------------------------------------------------
 
 # Scenarios with composite below this are considered failing
-COMPOSITE_FAILURE_THRESHOLD = 0.80
+COMPOSITE_FAILURE_THRESHOLD = 0.84
 
 # Individual dimensions below this trigger targeted diagnosis
 DIMENSION_FAILURE_THRESHOLD = 0.70
@@ -86,7 +86,7 @@ Your task is to analyze a failing evaluation result and output a structured root
 
 2. **clarification_gate** (`greenvest/nodes/clarification_gate.py`)
    Pure-logic gate. Asks for activity/environment when missing.
-   Editable: `_ENV_SENSITIVE_ACTIVITIES` set, question template strings
+   Editable: `_ENV_SENSITIVE_ACTIVITIES` set (use patch_set_literal), question template strings
    (`_build_activity_question`, `_build_environment_question` as string constants
    if they were extracted — otherwise patch the function return strings).
 
@@ -109,20 +109,28 @@ Your task is to analyze a failing evaluation result and output a structured root
 - relevance × 0.15  — directly addresses the query with actionable recommendations
 
 ## Output Format (valid JSON only, no prose)
-{
-  "failure_mode": "<low_accuracy|low_safety|low_persona|low_relevance|low_composite>",
-  "target_node": "<intent_router|clarification_gate|query_translator|ontology|synthesizer>",
-  "diagnosis": "<2–3 sentences: what specifically failed and why>",
-  "suggested_fix_type": "<patch_prompt|update_ontology|patch_phrase_list>",
-  "suggested_fix": {
-    "node_name": "<variable name, if patch_prompt — e.g. '_REI_PERSONA'>",
-    "category": "<ontology category, if update_ontology — e.g. 'sleeping_bags'>",
-    "alias_key": "<ontology alias key, if update_ontology — e.g. 'winter camping / winter camp'>",
-    "new_phrases": ["<phrase1>", "<phrase2>"],   // if patch_phrase_list
-    "description": "<plain-English description of what the new value should achieve>"
+
+Output a JSON **array** of up to 3 diagnoses ordered by confidence (highest first).
+If there is only one plausible fix, output a single-element array.
+
+[
+  {
+    "failure_mode": "<low_accuracy|low_safety|low_persona|low_relevance|low_composite>",
+    "target_node": "<intent_router|clarification_gate|query_translator|ontology|synthesizer>",
+    "diagnosis": "<2–3 sentences: what specifically failed and why>",
+    "suggested_fix_type": "<patch_prompt|update_ontology|patch_phrase_list|patch_set_literal>",
+    "suggested_fix": {
+      "node_name": "<variable name, if patch_prompt — e.g. '_REI_PERSONA'>",
+      "category": "<ontology category, if update_ontology — e.g. 'sleeping_bags'>",
+      "alias_key": "<ontology alias key, if update_ontology — e.g. 'winter camping / winter camp'>",
+      "new_phrases": ["<phrase1>", "<phrase2>"],
+      "new_items": ["<item1>"],
+      "description": "<plain-English description of what the new value should achieve>"
+    },
+    "confidence": <0.0–1.0>
   },
-  "confidence": <0.0–1.0>
-}
+  ...
+]
 """.strip()
 
 _CRITIC_USER_TEMPLATE = """\
@@ -131,14 +139,14 @@ _CRITIC_USER_TEMPLATE = """\
 **Scenario ID:** {scenario_id}
 **Customer Query:** {query}
 
+**Judge Reasoning:** {reasoning}
+
 **Judge Scores:**
 - Composite: {composite:.3f}
 - Accuracy:  {accuracy:.3f}
 - Safety:    {safety:.3f}
 - Persona:   {persona:.3f}
 - Relevance: {relevance:.3f}
-
-**Judge Reasoning:** {reasoning}
 
 {ground_truth_section}
 Diagnose the root cause and output your JSON analysis.
@@ -202,7 +210,44 @@ def _extract_json(raw: str) -> dict | None:
     return None
 
 
-async def _call_critic_once(user_prompt: str) -> dict | None:
+def _extract_json_or_list(raw: str) -> dict | list | None:
+    """Extract the first JSON object or array from a string, tolerating surrounding prose."""
+    raw = raw.strip()
+    # Strip markdown code fences
+    if raw.startswith("```"):
+        raw = "\n".join(raw.split("\n")[1:]).rstrip("`").strip()
+    # Try direct parse first (handles both objects and arrays)
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        pass
+    # Find the first { or [ block, whichever comes first
+    start_obj = raw.find("{")
+    start_arr = raw.find("[")
+    if start_obj == -1 and start_arr == -1:
+        return None
+    # Pick whichever delimiter appears first
+    if start_arr != -1 and (start_obj == -1 or start_arr < start_obj):
+        start = start_arr
+        open_ch, close_ch = "[", "]"
+    else:
+        start = start_obj
+        open_ch, close_ch = "{", "}"
+    depth = 0
+    for i, ch in enumerate(raw[start:], start):
+        if ch == open_ch:
+            depth += 1
+        elif ch == close_ch:
+            depth -= 1
+            if depth == 0:
+                try:
+                    return json.loads(raw[start : i + 1])
+                except json.JSONDecodeError:
+                    return None
+    return None
+
+
+async def _call_critic_once(user_prompt: str) -> dict | list | None:
     """Single attempt: invoke the critic LLM and parse the JSON response."""
     from langchain_core.messages import SystemMessage
     from eval.token_counter import record
@@ -215,7 +260,7 @@ async def _call_critic_once(user_prompt: str) -> dict | None:
         usage = record("critic", response.response_metadata)
         if usage.total > 0:
             print(f"[Critic] Tokens this call: {usage}", file=sys.stderr)
-        result = _extract_json(response.content)
+        result = _extract_json_or_list(response.content)
         if result is None:
             print("[WARN] Critic returned no parseable JSON.", file=sys.stderr)
         return result
@@ -224,7 +269,7 @@ async def _call_critic_once(user_prompt: str) -> dict | None:
         return None
 
 
-async def _call_critic(user_prompt: str) -> dict | None:
+async def _call_critic(user_prompt: str) -> dict | list | None:
     """Invoke the critic LLM with exponential-backoff retries.
 
     Retries up to _LLM_MAX_RETRIES times on None results (parse failure or
@@ -434,12 +479,15 @@ async def analyze_failures(
     # Normalize: convert any BaseException to None so downstream code only
     # ever sees dict | None.  This eliminates the isinstance(…, Exception)
     # scatter-check and makes the handling path uniform.
-    raw_results: list[dict | None] = [
+    raw_results: list[dict | list | None] = [
         (None if isinstance(r, BaseException) else r) for r in _raw
     ]
 
     # ── Process results ──────────────────────────────────────────────────
     gradients: list[TextualGradient] = []
+
+    _VALID_NODES = frozenset(_NODE_TO_FILE)
+    _VALID_FIX_TYPES = frozenset({"patch_prompt", "update_ontology", "patch_phrase_list", "patch_set_literal"})
 
     for meta, raw_result in zip(prompt_meta, raw_results):
         scenario_id, scores, query, _gt_section, failure_mode, reasoning = meta
@@ -448,59 +496,69 @@ async def analyze_failures(
             print(f"[Critic] {scenario_id}: LLM call failed — skipping.", file=sys.stderr)
             continue
 
-        target_node = raw_result.get("target_node")
-        fix_type = raw_result.get("suggested_fix_type")
-
-        _VALID_NODES = frozenset(_NODE_TO_FILE)
-        _VALID_FIX_TYPES = frozenset({"patch_prompt", "update_ontology", "patch_phrase_list"})
-
-        if not target_node or target_node not in _VALID_NODES:
-            print(
-                f"[Critic] {scenario_id}: LLM returned invalid or missing 'target_node' "
-                f"({target_node!r}) — skipping gradient. "
-                f"Valid nodes: {sorted(_VALID_NODES)}",
-                file=sys.stderr,
-            )
-            continue
-        if not fix_type or fix_type not in _VALID_FIX_TYPES:
-            print(
-                f"[Critic] {scenario_id}: LLM returned invalid or missing 'suggested_fix_type' "
-                f"({fix_type!r}) — skipping gradient. "
-                f"Valid types: {sorted(_VALID_FIX_TYPES)}",
-                file=sys.stderr,
-            )
+        # Normalize: if dict wrap in list; if list use as-is; otherwise skip
+        if isinstance(raw_result, dict):
+            items = [raw_result]
+        elif isinstance(raw_result, list):
+            items = raw_result
+        else:
+            print(f"[Critic] {scenario_id}: unexpected result type — skipping.", file=sys.stderr)
             continue
 
-        target_file = _NODE_TO_FILE[target_node]
-        confidence = float(raw_result.get("confidence", 0.5))
+        for item in items:
+            if not isinstance(item, dict):
+                continue
 
-        # Skip if this key has been attempted max_retries_per_fix times already
-        key = (scenario_id, fix_type, target_node)
-        attempt_count = tried_fixes_counter.get(key, 0)
-        if attempt_count >= max_retries_per_fix:
-            print(
-                f"[Critic] {scenario_id}: skipping {fix_type}->{target_node} "
-                f"(attempted {attempt_count}/{max_retries_per_fix} times — blocked)."
+            target_node = item.get("target_node")
+            fix_type = item.get("suggested_fix_type")
+
+            if not target_node or target_node not in _VALID_NODES:
+                print(
+                    f"[Critic] {scenario_id}: LLM returned invalid or missing 'target_node' "
+                    f"({target_node!r}) — skipping gradient. "
+                    f"Valid nodes: {sorted(_VALID_NODES)}",
+                    file=sys.stderr,
+                )
+                continue
+            if not fix_type or fix_type not in _VALID_FIX_TYPES:
+                print(
+                    f"[Critic] {scenario_id}: LLM returned invalid or missing 'suggested_fix_type' "
+                    f"({fix_type!r}) — skipping gradient. "
+                    f"Valid types: {sorted(_VALID_FIX_TYPES)}",
+                    file=sys.stderr,
+                )
+                continue
+
+            target_file = _NODE_TO_FILE[target_node]
+            confidence = float(item.get("confidence", 0.5))
+
+            # Skip if this key has been attempted max_retries_per_fix times already
+            key = (scenario_id, fix_type, target_node)
+            attempt_count = tried_fixes_counter.get(key, 0)
+            if attempt_count >= max_retries_per_fix:
+                print(
+                    f"[Critic] {scenario_id}: skipping {fix_type}->{target_node} "
+                    f"(attempted {attempt_count}/{max_retries_per_fix} times — blocked)."
+                )
+                continue
+
+            gradient = TextualGradient(
+                scenario_id=scenario_id,
+                query=query,
+                scores=scores,
+                failure_mode=item.get("failure_mode", failure_mode),
+                target_node=target_node,
+                target_file=target_file,
+                diagnosis=item.get("diagnosis", ""),
+                suggested_fix_type=fix_type,
+                suggested_fix=item.get("suggested_fix", {}),
+                confidence=confidence,
+                judge_reasoning=reasoning,
             )
-            continue
-
-        gradient = TextualGradient(
-            scenario_id=scenario_id,
-            query=query,
-            scores=scores,
-            failure_mode=raw_result.get("failure_mode", failure_mode),
-            target_node=target_node,
-            target_file=target_file,
-            diagnosis=raw_result.get("diagnosis", ""),
-            suggested_fix_type=fix_type,
-            suggested_fix=raw_result.get("suggested_fix", {}),
-            confidence=confidence,
-            judge_reasoning=reasoning,
-        )
-        gradients.append(gradient)
-        print(
-            f"[Critic] {scenario_id}: {gradient.failure_mode} -> {gradient.target_node} "
-            f"(confidence={confidence:.2f})"
-        )
+            gradients.append(gradient)
+            print(
+                f"[Critic] {scenario_id}: {gradient.failure_mode} -> {gradient.target_node} "
+                f"(confidence={confidence:.2f})"
+            )
 
     return gradients

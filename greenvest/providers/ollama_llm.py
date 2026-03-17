@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 
 class IntentRouterOutput(BaseModel):
-    intent: Literal["Product_Search", "Education", "Support", "Out_of_Bounds"]
+    intent: Literal["Product_Search", "Education", "Support", "Out_of_Bounds", "Greeting"]
     activity: Optional[Literal[
         "day_hiking", "backpacking", "thru_hiking", "winter_camping",
         "car_camping", "rock_climbing", "skiing", "mountaineering", "alpine_climbing"
@@ -99,6 +99,10 @@ def ollama_intent_router(query: str) -> dict:
         "You are an intent classifier for an REI outdoor gear store assistant.\n"
         "Classify the user query and extract entities.\n\n"
         "Intent values:\n"
+        "  - Greeting: bare social openers or pleasantries with zero gear, product, or activity meaning\n"
+        "    e.g. 'hi', 'hello', 'hey', 'good morning', 'thanks', 'bye', 'ok', 'yes', 'no'\n"
+        "    NEVER use Greeting if the message contains any outdoor activity, gear type, or product word.\n"
+        "    e.g. 'camping', 'hiking', 'tent', 'jacket' are Product_Search, NOT Greeting.\n"
         "  - Product_Search: looking for specific gear or product recommendations\n"
         "    e.g. 'I need a sleeping bag', 'recommend a jacket for rain'\n"
         "  - Education: how-to, what-is, explain, compare, best-for questions about gear or outdoor activities\n"

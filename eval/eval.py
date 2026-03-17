@@ -100,11 +100,12 @@ async def _process_scenario(sc: dict, lf) -> tuple[dict, float, float, float, fl
 
     entry: dict = {"scenario_id": scenario_id}
 
-    # Log to Langfuse (trace created explicitly to avoid context-var bleed in concurrent coroutines)
+    # Log to Langfuse (v4 API: start_observation returns a span object, not a context manager)
     if lf and scores:
         try:
-            trace = lf.trace(
+            span = lf.start_observation(
                 name=f"eval_{scenario_id}",
+                as_type="evaluator",
                 input={"query": query, "scenario_id": scenario_id},
                 output={"recommendation": recommendation},
             )
@@ -116,14 +117,10 @@ async def _process_scenario(sc: dict, lf) -> tuple[dict, float, float, float, fl
                 ("judge_relevance", scores.relevance),
             ]:
                 try:
-                    lf.score(
-                        trace_id=trace.id,
-                        name=score_name,
-                        value=score_val,
-                        data_type="NUMERIC",
-                    )
+                    span.score_trace(name=score_name, value=score_val, data_type="NUMERIC")
                 except Exception as exc:
                     print(f"  [WARN] Langfuse score failed ({score_name}): {exc}", file=sys.stderr)
+            span.end()
         except Exception as exc:
             print(f"  [WARN] Langfuse trace failed: {exc}", file=sys.stderr)
 
@@ -212,6 +209,9 @@ async def run_eval(dataset_dir: Path, output_path: Path) -> dict:
         print(f"Overall composite: {avg_composite:.3f}")
     else:
         print("Overall composite: N/A (no judge scores)")
+
+    if lf:
+        lf.flush()
 
     return output
 

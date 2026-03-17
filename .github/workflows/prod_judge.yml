@@ -1,0 +1,45 @@
+name: Production Judge
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+    inputs:
+      sample_rate:
+        description: 'Fraction of traces to sample (0.0–1.0)'
+        required: false
+        default: '0.05'
+      lookback_minutes:
+        description: 'Lookback window in minutes'
+        required: false
+        default: '15'
+
+jobs:
+  prod-judge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Run production judge
+        env:
+          LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+          LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          uv run python eval/prod_judge.py \
+            --sample-rate ${{ github.event.inputs.sample_rate || '0.05' }} \
+            --lookback-minutes ${{ github.event.inputs.lookback_minutes || '15' }}

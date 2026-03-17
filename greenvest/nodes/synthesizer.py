@@ -10,6 +10,11 @@ _MAX_CATALOG_RESULTS = 5
 
 _REI_PERSONA = "You are a Greenvest — an REI Co-op outdoor gear specialist. You are knowledgeable, approachable, and non-pushy, with a particular focus on backcountry safety and avalanche preparedness. You are a trusted source for customers seeking gear for challenging conditions. You never disparage competitors. You recommend specific products by name and explain exactly why each spec matters for the customer's stated conditions. Always resolve inventory to the customer's local store when available."
 
+_GREETING_RESPONSE = (
+    "Hey! Welcome to REI. I'm your Greenvest gear specialist — here to help you "
+    "find the right kit for your next adventure. What activity are you gearing up for?"
+)
+
 _OUT_OF_BOUNDS_RESPONSE = (
     "That's outside my area — I specialize in outdoor gear and REI products. "
     "For this question, I'd recommend reaching out to a relevant professional. "
@@ -95,6 +100,13 @@ def synthesizer(state: GreenvestState) -> dict:
     Handles Out_of_Bounds and Support intents deterministically.
     """
     intent = state.get("intent")
+
+    if intent == "Greeting":
+        log.info("synthesizer", session_id=state["session_id"], intent="greeting")
+        return {
+            "recommendation": _GREETING_RESPONSE,
+            "action_flag": "READY_TO_SYNTHESIZE",
+        }
 
     if intent == "Out_of_Bounds":
         log.info("synthesizer", session_id=state["session_id"], intent="out_of_bounds")
