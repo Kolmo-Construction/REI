@@ -39,6 +39,9 @@ class GreenvestState(TypedDict):
     messages: list                   # Compressed conversation history (list[BaseMessage])
     compressed_summary: Optional[str]  # Summary of turns > 4 (synchronous, in-path)
 
+    # LLM-driven routing flags
+    requires_environment_context: bool  # Set by intent_router; True if gear depends on weather/terrain
+
     # Output
     recommendation: Optional[str]   # Final synthesized recommendation
 
@@ -70,4 +73,5 @@ def initial_state(
         messages=[],
         compressed_summary=None,
         recommendation=None,
+        requires_environment_context=False,
     )

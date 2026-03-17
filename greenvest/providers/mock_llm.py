@@ -69,11 +69,18 @@ def mock_intent_router(query: str) -> dict:
     activity = _extract_activity(q)
     environment = _extract_environment(q)
 
+    _ENV_SENSITIVE_ACTIVITIES = {
+        "backpacking", "thru_hiking", "winter_camping",
+        "mountaineering", "alpine_climbing", "rock_climbing", "skiing",
+    }
+    requires_environment_context = activity in _ENV_SENSITIVE_ACTIVITIES
+
     return {
         "intent": intent,
         "activity": activity,
         "user_environment": environment,
         "experience_level": None,
+        "requires_environment_context": requires_environment_context,
     }
 
 

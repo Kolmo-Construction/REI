@@ -13,12 +13,15 @@ def intent_router(state: GreenvestState) -> dict:
     router_fn = get_intent_router()
     result = router_fn(state["query"])
 
+    requires_environment_context: bool = result.get("requires_environment_context", False)
+
     log.info(
         "intent_router",
         session_id=state["session_id"],
         intent=result.get("intent"),
         activity=result.get("activity"),
         user_environment=result.get("user_environment"),
+        requires_environment_context=requires_environment_context,
     )
 
     def _clean(val):
@@ -30,4 +33,5 @@ def intent_router(state: GreenvestState) -> dict:
         "activity": _clean(result.get("activity")),
         "user_environment": _clean(result.get("user_environment")),
         "experience_level": _clean(result.get("experience_level")),
+        "requires_environment_context": requires_environment_context,
     }

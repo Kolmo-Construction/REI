@@ -3,16 +3,6 @@ from greenvest.state import GreenvestState
 
 log = structlog.get_logger(__name__)
 
-# Activities that require environment context before retrieval
-_ENV_SENSITIVE_ACTIVITIES = {
-    "winter_camping",
-    "alpine_climbing",
-    "mountaineering",
-    "backpacking",
-    "thru_hiking",
-}
-
-
 def clarification_gate(state: GreenvestState) -> dict:
     """
     Pure logic, no LLM call.
@@ -26,6 +16,7 @@ def clarification_gate(state: GreenvestState) -> dict:
     activity = state.get("activity")
     user_environment = state.get("user_environment")
     clarification_count = state.get("clarification_count", 0)
+    requires_env: bool = state.get("requires_environment_context", False)
 
     # Out_of_Bounds — deterministic refusal (handled downstream in synthesizer)
     if intent == "Out_of_Bounds":
@@ -62,9 +53,9 @@ def clarification_gate(state: GreenvestState) -> dict:
             "clarification_count": clarification_count + 1,
         }
 
-    # Missing environment for activities that require it
-    if activity in _ENV_SENSITIVE_ACTIVITIES and not user_environment:
-        question = _build_environment_question(activity)
+    # Missing environment for activities that require it (flag set by LLM)
+    if requires_env and not user_environment:
+        question = _build_environment_question(activity or "your trip")
         log.info(
             "clarification_gate",
             decision="needs_environment",

@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Literal, Optional
 
 from langchain_ollama import ChatOllama
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from greenvest.config import settings
 
@@ -30,6 +30,16 @@ class IntentRouterOutput(BaseModel):
     ]] = None
     user_environment: Optional[str] = None
     experience_level: Optional[Literal["beginner", "intermediate", "expert"]] = None
+    requires_environment_context: bool = Field(
+        default=False,
+        description=(
+            "Set to true if the gear for the extracted activity heavily depends on weather, "
+            "terrain, or trip duration — e.g., hiking, backpacking, mountaineering, alpine "
+            "climbing, winter camping, or any activity involving tents or technical equipment. "
+            "Set to false for generic lifestyle items, indoor activities, or queries where "
+            "environment has no meaningful impact on gear selection."
+        ),
+    )
 
 
 class DerivedSpecs(BaseModel):
@@ -129,6 +139,7 @@ def ollama_intent_router(query: str) -> dict:
         "activity": result.activity,
         "user_environment": result.user_environment,
         "experience_level": result.experience_level,
+        "requires_environment_context": result.requires_environment_context,
     }
 
 
